@@ -1,0 +1,3 @@
+[submodule "proto"]
+	path = proto
+	url = https://github.com/AaronLi/CS4471-SIMS-Protobuf.git
