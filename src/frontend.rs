@@ -23,7 +23,7 @@ pub(crate) async fn login(rpc: Arc<Mutex<Option<SimsFrontendClient<Channel>>>>, 
         }
     };
 
-    let response = rpc_present.cred_auth(LoginRequest{username, password}).await.map(|x|x.into_inner()).map_err(|e|LoginResult::ServerError(e));
+    let response = rpc_present.cred_auth(LoginRequest{username, password}).await.map(|x|x.into_inner()).map_err(|e|ServerError(e));
     let _ = rpc.lock().await.insert(rpc_present);
 
     response
