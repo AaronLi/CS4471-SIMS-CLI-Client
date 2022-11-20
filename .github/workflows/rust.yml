@@ -23,6 +23,6 @@ jobs:
     - name: Archive production artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: sims-cli-${{env.RUNNER_OS}}-${{env.RUNNER_ARCH}}
+        name: format("sims-cli-{0}-{1}", ${{env.RUNNER_OS}}, ${{env.RUNNER_ARCH}})
         path: |
           target/release/cs4471-sims-cli-client
