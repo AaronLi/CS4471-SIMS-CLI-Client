@@ -1,6 +1,7 @@
+#[derive(Debug)]
 pub(crate) enum SimsClientState {
-    Unauthenticated{username: String, password: String},
-    Authenticating{username: String, password: String},
+    Unauthenticated{password: String},
+    Authenticating,
     AutomaticViewSelection,
     AllItemView,
     ShelfItemView,
