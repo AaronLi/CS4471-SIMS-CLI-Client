@@ -6,7 +6,6 @@ pub(crate) enum Message {
     LoginButtonClicked,
     UsernameInputChanged(String),
     PasswordInputChanged(String),
-    Connected(Result<(), String>),
     Authenticated(Result<Token, LoginResult>),
-    SelectScene(())
+    SelectScene(()),
 }

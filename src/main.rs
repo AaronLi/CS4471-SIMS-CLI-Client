@@ -2,10 +2,10 @@ use async_std::sync::Arc;
 use env_logger::Builder;
 use iced::{Application, Command, Element, executor, Length, Settings, Theme};
 use iced::futures::lock::Mutex;
-use iced::futures::TryFutureExt;
 use iced::Length::Fill;
-use iced::widget::{button, column, container, row, Space, text, TextInput};
-use log::{debug, error, info, LevelFilter};
+use iced::widget::{button, column, container, Image, row, Space, text, TextInput, horizontal_rule};
+use iced::widget::image::Handle;
+use log::{debug, info, LevelFilter};
 use tonic::transport::{Channel};
 
 use crate::frontend::sims_ims_frontend::sims_frontend_client::SimsFrontendClient;
@@ -15,6 +15,7 @@ use crate::states::SimsClientState;
 mod states;
 mod frontend;
 mod iced_messages;
+mod assets;
 
 
 pub fn main() -> iced::Result {
@@ -50,10 +51,9 @@ impl Application for ClientState {
             token: None,
             previous_view: None
         };
-        let rpc_ = Arc::clone(&new_client.rpc);
         (
             new_client,
-            Command::perform(frontend::connect("http://localhost:50051".to_owned(), rpc_).map_err(|e|{format!("{:?}", e)}), Message::Connected)
+            Command::none()
         )
     }
 
@@ -81,23 +81,13 @@ impl Application for ClientState {
             Message::LoginButtonClicked => {
                 if let SimsClientState::Unauthenticated { ref password } = self.state {
                     let client_ = Arc::clone(&self.rpc);
-                    let ret = Command::perform(frontend::login(client_, self.username.to_owned(), password.to_owned()), Message::Authenticated);
+                    let ret = Command::perform(frontend::login(client_, "http://localhost:50051".to_owned(), self.username.to_owned(), password.to_owned()), Message::Authenticated);
                     self.state = SimsClientState::Authenticating;
                     ret
                 }else {
                     // login button clicked in non-login screen
                     Command::none()
                 }
-            }
-
-            Message::Connected(connect_result) => {
-                match connect_result {
-                    Ok(_) => {info!("Connected")}
-                    Err(e) => {
-                        error!("Failed to connect: {}", e)
-                    }
-                }
-                Command::none()
             }
             Message::Authenticated(authentication_result) => {
                 match authentication_result {
@@ -113,7 +103,7 @@ impl Application for ClientState {
                         }
                     }
                     Err(err) => {
-                        info!("Failed to log in");
+                        info!("Failed to log in {:?}", err);
                         self.username = String::new();
                         self.state = SimsClientState::Unauthenticated {password: String::new()};
                         Command::none()
@@ -138,12 +128,15 @@ impl Application for ClientState {
     fn view(&self) -> Element<'_, Self::Message> {
         match &self.state {
             SimsClientState::Unauthenticated { password} => {
-                let elements = row![Space::with_width(Length::FillPortion(1)), column![
-                    container(text("SIMS IMS")).width(Fill).center_x(),
-                    TextInput::new("Username", &self.username, Message::UsernameInputChanged),
-                    TextInput::new("Password", password, Message::PasswordInputChanged),
-                    container(button("Login").on_press(Message::LoginButtonClicked)).width(Fill).center_x()
-                ].width(Length::FillPortion(1)), Space::with_width(Length::FillPortion(1))];
+                let elements = row![Space::with_width(Length::FillPortion(3)), column![
+                    container(Image::new(Handle::from_memory(assets::SIMS_LOGO)).height(Length::Units(130))).width(Fill).center_x(),
+                    container(text("SIMS IMS").size(30)).width(Fill).center_x(),
+                    horizontal_rule(20),
+                    TextInput::new("Username", &self.username, Message::UsernameInputChanged).padding(10),
+                    TextInput::new("Password", password, Message::PasswordInputChanged).padding(10).password(),
+                    horizontal_rule(20),
+                    button("Login").on_press(Message::LoginButtonClicked).width(Fill)
+                ].width(Length::FillPortion(2)), Space::with_width(Length::FillPortion(3))];
 
                 container(elements)
                     .width(Fill)

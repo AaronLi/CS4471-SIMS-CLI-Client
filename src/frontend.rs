@@ -9,33 +9,22 @@ pub mod sims_ims_frontend {
     tonic::include_proto!("sims_ims_frontend");
 }
 
-pub(crate) async fn connect(address: String,rpc: Arc<Mutex<Option<SimsFrontendClient<Channel>>>>) -> Result<(), Error> {
-    match SimsFrontendClient::connect(address).await {
-        Ok(client) => {
-            let _ = rpc.lock().await.insert(client);
-            Ok(())
-        }
-        Err(e) => {
-            Err(e)
-        }
-    }
-
-}
-
 #[derive(Debug, Clone)]
 pub(crate) enum LoginResult {
     ServerError(tonic::Status),
     NotConnected
 }
 
-pub(crate) async fn login(rpc: Arc<Mutex<Option<SimsFrontendClient<Channel>>>>, username: String, password: String) -> Result<Token, LoginResult> {
-    match rpc.lock().await.as_mut() {
-        None => {Err(NotConnected)}
+pub(crate) async fn login(rpc: Arc<Mutex<Option<SimsFrontendClient<Channel>>>>, address: String, username: String, password: String) -> Result<Token, LoginResult> {
+    let mut rpc_present = match rpc.lock().await.take() {
+        None => {SimsFrontendClient::connect(address).await.map_err(|_|NotConnected)?}
         Some(client_rpc) => {
-            client_rpc.cred_auth(LoginRequest{
-                username,
-                password
-            }).await.map(|r|r.into_inner()).map_err(|e| ServerError(e))
+            client_rpc
         }
-    }
+    };
+
+    let response = rpc_present.cred_auth(LoginRequest{username, password}).await.map(|x|x.into_inner()).map_err(|e|LoginResult::ServerError(e));
+    let _ = rpc.lock().await.insert(rpc_present);
+
+    response
 }
