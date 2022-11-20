@@ -12,19 +12,17 @@ env:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
     - uses: actions/checkout@v3
       with:
         submodules: true
-    - name: Install apt requirements
-      run: sudo apt install protobuf-compiler
     - name: Build
-      run: cargo build --verbose --release
+      run: cargo build --release
     - name: Archive production artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: sims-cli-${{env.RUNNER_OS}}-${{env.RUNNER_ARCH}})
+        name: sims-cli-linux-x86_64
         path: |
           target/release/cs4471-sims-cli-client
