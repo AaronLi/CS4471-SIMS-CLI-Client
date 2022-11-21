@@ -2,13 +2,13 @@ use crate::frontend::sims_ims_frontend::{LoginRequest, Token};
 use crate::frontend::LoginResult::{NotConnected, ServerError};
 use async_std::sync::Arc;
 use iced::futures::lock::Mutex;
-use iced::widget::{container, row, Button, Svg, Row, Space, text, button, svg};
-use iced::Length;
+use iced::widget::{container, Button, Svg, Row, Space, text, svg};
+use iced::{Element, Length, Renderer};
 use iced::Length::{Fill, Shrink};
 use iced::widget::image::Handle;
 use sims_ims_frontend::sims_frontend_client::SimsFrontendClient;
-use tonic::transport::{Channel, Error};
-use crate::assets::CLOSE_ICON_SVG;
+use tonic::transport::{Channel};
+use crate::assets::{BOOTSTRAP_FONT, CLOSE_ICON, get_icon};
 use crate::frontend::TabId::AllShelves;
 use crate::iced_messages::Message;
 use crate::iced_messages::Message::{CloseShelf, TabSelected};
@@ -59,12 +59,13 @@ pub(crate) async fn login(
     response
 }
 
-pub(crate) fn create_tab<'a>(tab_id: TabId, text_content: String, closeable: bool, icon: Option<Svg>) -> Button<'a, Message> {
+pub(crate) fn create_tab<'a>(tab_id: TabId, text_content: String, closeable: bool, icon: Option<char>) -> Button<'a, Message> {
     let mut button_display = Row::new();
 
-    if let Some(svg) = icon {
+    if let Some(c) = icon {
+        let icon_image = get_icon(c);
         button_display = button_display
-            .push(svg.width(Shrink))
+            .push(icon_image)
             .push(Space::with_width(Length::Units(5)));
     }
 
@@ -72,7 +73,7 @@ pub(crate) fn create_tab<'a>(tab_id: TabId, text_content: String, closeable: boo
 
     if closeable {
         button_display = button_display.push(Space::with_width(Length::Units(5))).push(
-            Button::new(Svg::new(svg::Handle::from_memory(CLOSE_ICON_SVG)).width(Shrink)).on_press(CloseShelf(tab_id.clone()))
+            Button::new(svg(svg::Handle::from_memory(CLOSE_ICON)).width(Length::Shrink)).on_press(CloseShelf(tab_id.clone()))
         )
     }
 

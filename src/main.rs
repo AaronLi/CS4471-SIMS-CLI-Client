@@ -1,17 +1,16 @@
 use async_std::sync::{Arc};
 use env_logger::Builder;
-use iced::{Alignment, Application, Color, Command, Element, executor, Length, Theme, window};
-use iced::alignment::{Horizontal, Vertical};
+use iced::{Application, Color, Command, Element, executor, Length, Theme, window};
 use iced::futures::lock::Mutex;
 use iced::Length::{Fill, Shrink};
-use iced::widget::{button, column, container, Image, row, Space, text, TextInput, horizontal_rule, Column, Text, Container, Button, Svg, svg, image as iced_image, Row};
+use iced::widget::{button, column, container, Image, row, Space, text, TextInput, horizontal_rule, Column, Button, Svg, image as iced_image, Row};
 use iced::window::icon::Icon;
 use iced::widget::svg::Handle;
 use image::ImageFormat;
 use linked_hash_set::LinkedHashSet;
 use log::{debug, info, LevelFilter};
 use tonic::transport::{Channel};
-use crate::assets::{SIMS_LOGO_SQUARE, SHELF_ICON_SVG, ITEMS_ICON_SVG};
+use crate::assets::SIMS_LOGO_SQUARE;
 use crate::frontend::{LoginResult, create_tab, TabId};
 
 use crate::frontend::sims_ims_frontend::sims_frontend_client::SimsFrontendClient;
@@ -34,9 +33,7 @@ pub fn main() -> iced::Result {
             icon: Icon::from_file_data(SIMS_LOGO_SQUARE, Some(ImageFormat::Png)).ok(),
             ..window::Settings::default()
         },
-
         ..iced::Settings::default()
-
     })
 }
 
@@ -131,7 +128,7 @@ impl Application for ClientState {
                         self.state = SimsClientState::Unauthenticated {
                             password: String::new(),
                             error_message: Some(match err {
-                                LoginResult::ServerError(e) => format!("Placeholder: {:?}", e),
+                                LoginResult::ServerError(e) => format!("Placeholder: {:?}", e), //TODO: fill in text
                                 LoginResult::NotConnected => "Could not connect to server".to_owned()
                             })
                         };
@@ -147,7 +144,7 @@ impl Application for ClientState {
             Message::CloseShelf(tab_id) => {
                 match tab_id {
                     TabId::AllShelves | TabId::AllItems => {} // can't delete these tabs
-                    TabId::ShelfItems(ref shelf_id) => {
+                    TabId::ShelfItems(_) => {
                         self.tabs.remove(&tab_id);
                         // replace with drain_filter when stable
                         for i in (0..self.current_tab.len()).rev() {
@@ -217,10 +214,10 @@ impl Application for ClientState {
 
                 let tabs = self.tabs.iter()
                     .map(| tab_info| match tab_info {
-                        TabId::AllShelves => create_tab(tab_info.clone(), "Shelves".to_owned(), false, Some(Svg::new(Handle::from_memory(SHELF_ICON_SVG)))),
-                        TabId::AllItems => create_tab(tab_info.clone(), "Items".to_owned(), false, Some(Svg::new(Handle::from_memory(ITEMS_ICON_SVG)))),
+                        TabId::AllShelves => create_tab(tab_info.clone(), "Shelves".to_owned(), false, Some('\u{F685}')),
+                        TabId::AllItems => create_tab(tab_info.clone(), "Items".to_owned(), false, Some('\u{F7D3}')),
                         TabId::ShelfItems(shelf_id) => {
-                            create_tab(tab_info.clone(), shelf_id.clone(), true, None)
+                            create_tab(tab_info.clone(), shelf_id.clone(), true, Some('\u{F1C8}'))
                         }
                     })
                     .fold(
