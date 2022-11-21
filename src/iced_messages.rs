@@ -1,4 +1,4 @@
-use crate::frontend::LoginResult;
+use crate::frontend::{LoginResult, TabId};
 use crate::frontend::sims_ims_frontend::Token;
 
 #[derive(Debug, Clone)]
@@ -7,5 +7,7 @@ pub(crate) enum Message {
     UsernameInputChanged(String),
     PasswordInputChanged(String),
     Authenticated(Result<Token, LoginResult>),
-    SelectScene(()),
+    TabSelected(TabId),
+    CloseShelf(TabId),
+    OpenShelf(TabId)
 }
