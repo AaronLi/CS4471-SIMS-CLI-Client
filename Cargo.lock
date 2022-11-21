@@ -722,6 +722,7 @@ dependencies = [
  "env_logger",
  "iced",
  "iced_aw",
+ "image",
  "log",
  "prost",
  "tonic",

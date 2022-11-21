@@ -1,12 +1,17 @@
 use async_std::sync::Arc;
 use env_logger::Builder;
-use iced::{Application, Command, Element, executor, Length, Settings, Theme};
+use iced::{Alignment, Application, Color, Command, Element, executor, Length, Theme, window};
+use iced::alignment::Horizontal;
 use iced::futures::lock::Mutex;
 use iced::Length::Fill;
 use iced::widget::{button, column, container, Image, row, Space, text, TextInput, horizontal_rule};
 use iced::widget::image::Handle;
+use iced::window::icon::Icon;
+use image::ImageFormat;
 use log::{debug, info, LevelFilter};
 use tonic::transport::{Channel};
+use crate::assets::SIMS_LOGO_SQUARE;
+use crate::frontend::LoginResult;
 
 use crate::frontend::sims_ims_frontend::sims_frontend_client::SimsFrontendClient;
 use crate::iced_messages::Message;
@@ -22,7 +27,15 @@ pub fn main() -> iced::Result {
     Builder::new()
         .filter_module("cs4471_sims_cli_client", LevelFilter::Debug)
         .init();
-    ClientState::run(Settings::default())
+    ClientState::run(iced::Settings{
+        window: window::Settings{
+            icon: Icon::from_file_data(SIMS_LOGO_SQUARE, Some(ImageFormat::Png)).ok(),
+            ..window::Settings::default()
+        },
+
+        ..iced::Settings::default()
+
+    })
 }
 
 
@@ -45,7 +58,8 @@ impl Application for ClientState {
         let new_client = ClientState {
             username: String::new(),
             state: SimsClientState::Unauthenticated{
-                password: "".to_string()
+                password: "".to_string(),
+                error_message: None
             },
             rpc: Arc::new(Mutex::new(None)),
             token: None,
@@ -79,7 +93,7 @@ impl Application for ClientState {
                 Command::none()
             },
             Message::LoginButtonClicked => {
-                if let SimsClientState::Unauthenticated { ref password } = self.state {
+                if let SimsClientState::Unauthenticated { ref password, .. } = self.state {
                     let client_ = Arc::clone(&self.rpc);
                     let ret = Command::perform(frontend::login(client_, "http://localhost:50051".to_owned(), self.username.to_owned(), password.to_owned()), Message::Authenticated);
                     self.state = SimsClientState::Authenticating;
@@ -105,7 +119,13 @@ impl Application for ClientState {
                     Err(err) => {
                         info!("Failed to log in {:?}", err);
                         self.username = String::new();
-                        self.state = SimsClientState::Unauthenticated {password: String::new()};
+                        self.state = SimsClientState::Unauthenticated {
+                            password: String::new(),
+                            error_message: Some(match err {
+                                LoginResult::ServerError(e) => format!("Placeholder: {:?}", e),
+                                LoginResult::NotConnected => "Could not connect to server".to_owned()
+                            })
+                        };
                         Command::none()
                     }
                 }
@@ -127,15 +147,18 @@ impl Application for ClientState {
 
     fn view(&self) -> Element<'_, Self::Message> {
         match &self.state {
-            SimsClientState::Unauthenticated { password} => {
+            SimsClientState::Unauthenticated { password, error_message} => {
                 let elements = row![Space::with_width(Length::FillPortion(3)), column![
-                    container(Image::new(Handle::from_memory(assets::SIMS_LOGO)).height(Length::Units(130))).width(Fill).center_x(),
+                    container(Image::new(Handle::from_memory(assets::SIMS_LOGO_SQUARE)).height(Length::Units(110))).width(Fill).center_x(),
                     container(text("SIMS IMS").size(30)).width(Fill).center_x(),
                     horizontal_rule(20),
                     TextInput::new("Username", &self.username, Message::UsernameInputChanged).padding(10),
                     TextInput::new("Password", password, Message::PasswordInputChanged).padding(10).password(),
                     horizontal_rule(20),
-                    button("Login").on_press(Message::LoginButtonClicked).width(Fill)
+                    button("Login").on_press(Message::LoginButtonClicked).width(Fill),
+                    container(text(match error_message{Some(message)=>message, None=>""}).style(
+                        Color::from_rgba(1.0, 0.0, 0.0, 1.0)
+                    )).height(Length::Units(50)).center_x().center_y()
                 ].width(Length::FillPortion(2)), Space::with_width(Length::FillPortion(3))];
 
                 container(elements)
@@ -163,5 +186,9 @@ impl Application for ClientState {
             }
             _ => container(text(format!("Placeholder for state: {:?}", self.state))).width(Fill).height(Fill).center_x().center_y().into()
         }
+    }
+
+    fn theme(&self) -> Self::Theme {
+        Theme::Dark
     }
 }
