@@ -1,35 +1,27 @@
-use crate::assets::{get_icon, logo_bytes, SIMS_LOGO_SQUARE};
-use crate::frontend::EditTarget::{NewItem, NewShelf};
-use crate::frontend::{create_tab, EditTarget, LoginResult, TabId};
+
 use async_std::sync::Arc;
 use env_logger::Builder;
+use iced::{Application, Command, Element, executor, Theme, window};
 use iced::futures::lock::Mutex;
-use iced::pure::widget::{
-    button, image as iced_image, Button, Column, Container, Image, Row, Space, Svg, Text, TextInput,
+use iced::Length::{Fill};
+use iced::widget::{
+    Container, Text,
 };
-use iced::pure::{text, Application, Element, Widget};
-use iced::widget::svg::Handle;
 use iced::window::icon::Icon;
-use iced::Length::{Fill, Shrink};
-use iced::{executor, window, Color, Command, Length, Rule};
-use iced_aw::pure::{FloatingElement, Modal};
-use image::io::Reader as ImageReader;
-use image::ImageFormat;
 use linked_hash_set::LinkedHashSet;
 use log::{debug, info, LevelFilter};
-use std::fmt::format;
-use std::io::Cursor;
 use tonic::transport::Channel;
 
+use crate::assets::logo_bytes;
+use crate::frontend::{EditTarget, LoginResult, TabId};
 use crate::frontend::sims_ims_frontend::sims_frontend_client::SimsFrontendClient;
-use crate::iced_messages::Message;
-use crate::iced_messages::Message::{StartEditing, StopEditing};
 use crate::states::SimsClientState;
-use crate::styles::Fab;
+use crate::ui_messages::Message;
+use crate::ui_messages::Message::{StartEditing, StopEditing};
 
 mod assets;
 mod frontend;
-mod iced_messages;
+mod ui_messages;
 mod states;
 mod styles;
 mod views;
@@ -66,8 +58,9 @@ struct ClientState {
 impl Application for ClientState {
     type Executor = executor::Default;
     type Message = Message;
+    type Theme = Theme;
     type Flags = ();
-
+    
     fn new(_flags: ()) -> (Self, Command<Message>) {
         let mut new_client = ClientState {
             username: String::new(),
@@ -219,5 +212,9 @@ impl Application for ClientState {
             .center_y()
             .into(),
         }
+    }
+
+    fn theme(&self) -> Self::Theme {
+        Theme::Dark
     }
 }

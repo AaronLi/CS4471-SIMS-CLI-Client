@@ -1,17 +1,17 @@
 use std::io::Cursor;
 use image::io::Reader as ImageReader;
 use iced::Font;
-use iced::pure::widget::{Text};
+use iced::widget::{Text};
 
 pub(crate) const SIMS_LOGO_SQUARE: &[u8] = include_bytes!("assets/sims-square.png");
-pub(crate) const CLOSE_ICON: &[u8] = include_bytes!("assets/x-circle-fill-light.svg");
+pub(crate) const CLOSE_ICON: &[u8] = include_bytes!("assets/x-circle-fill.svg");
 pub(crate) const BOOTSTRAP_FONT: Font = Font::External {
     name: "Bootstrap Icons",
     bytes: include_bytes!("assets/bootstrap-icons.ttf")
 };
 
-pub(crate) fn get_icon(icon: char) -> Text {
-    Text::new(icon).font(BOOTSTRAP_FONT)
+pub(crate) fn get_icon<'a>(icon: char) -> Text<'a> {
+    Text::new(icon.to_string()).font(BOOTSTRAP_FONT)
 }
 
 pub(crate) fn logo_bytes() -> Option<(Vec<u8>, u32, u32)> {
