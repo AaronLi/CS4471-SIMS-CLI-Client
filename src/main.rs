@@ -1,16 +1,20 @@
+use std::io::Cursor;
 use async_std::sync::{Arc};
 use env_logger::Builder;
-use iced::{Application, Color, Command, Element, executor, Length, Theme, window};
+use iced::{Color, Command, executor, Length, Rule, window};
+use iced::pure::{Application, Element};
 use iced::futures::lock::Mutex;
 use iced::Length::{Fill, Shrink};
-use iced::widget::{button, column, container, Image, row, Space, text, TextInput, horizontal_rule, Column, Button, Svg, image as iced_image, Row};
+use iced::pure::widget::{button, Container, Text, Image, Space, TextInput, Column, Button, Svg, image as iced_image, Row};
 use iced::window::icon::Icon;
 use iced::widget::svg::Handle;
+use iced_aw::pure::Modal;
 use image::ImageFormat;
 use linked_hash_set::LinkedHashSet;
 use log::{debug, info, LevelFilter};
+use image::io::Reader as ImageReader;
 use tonic::transport::{Channel};
-use crate::assets::SIMS_LOGO_SQUARE;
+use crate::assets::{logo_bytes, SIMS_LOGO_SQUARE};
 use crate::frontend::{LoginResult, create_tab, TabId};
 
 use crate::frontend::sims_ims_frontend::sims_frontend_client::SimsFrontendClient;
@@ -21,6 +25,7 @@ mod states;
 mod frontend;
 mod iced_messages;
 mod assets;
+mod styles;
 
 const SERVER_ADDRESS: &str = "http://localhost:50051";
 
@@ -30,7 +35,12 @@ pub fn main() -> iced::Result {
         .init();
     ClientState::run(iced::Settings{
         window: window::Settings{
-            icon: Icon::from_file_data(SIMS_LOGO_SQUARE, Some(ImageFormat::Png)).ok(),
+            icon: match logo_bytes() {
+                None => None,
+                Some((bytes, width, height)) => {
+                    Icon::from_rgba(bytes, width, height).ok()
+                }
+            },
             ..window::Settings::default()
         },
         ..iced::Settings::default()
@@ -51,7 +61,6 @@ struct ClientState {
 impl Application for ClientState {
     type Executor = executor::Default;
     type Message = Message;
-    type Theme = Theme;
     type Flags = ();
 
     fn new(_flags: ()) -> (Self, Command<Message>)  {
@@ -167,23 +176,28 @@ impl Application for ClientState {
         }
     }
 
-    fn view(&self) -> Element<'_, Self::Message> {
+    fn view(&self) -> Element<Self::Message> {
         match &self.state {
             SimsClientState::Unauthenticated { password, error_message} => {
-                let elements = row![Space::with_width(Length::FillPortion(3)), column![
-                    container(Image::new(iced_image::Handle::from_memory(assets::SIMS_LOGO_SQUARE)).height(Length::Units(110))).width(Fill).center_x(),
-                    container(text("SIMS IMS").size(30)).width(Fill).center_x(),
-                    horizontal_rule(20),
-                    TextInput::new("Username", &self.username, Message::UsernameInputChanged).padding(10),
-                    TextInput::new("Password", password, Message::PasswordInputChanged).padding(10).password(),
-                    horizontal_rule(20),
-                    button("Login").on_press(Message::LoginButtonClicked).width(Fill),
-                    container(text(match error_message{Some(message)=>message, None=>""}).style(
-                        Color::from_rgba(1.0, 0.0, 0.0, 1.0)
-                    )).height(Length::Units(50)).center_x().center_y()
-                ].width(Length::FillPortion(2)), Space::with_width(Length::FillPortion(3))];
+                let elements = Row::new()
+                    .push(Space::with_width(Length::FillPortion(3)))
+                    .push(
+                        Column::new()
+                            .push(Container::new(Image::new(iced_image::Handle::from_memory(Vec::from(assets::SIMS_LOGO_SQUARE))).height(Length::Units(110))).width(Fill).center_x())
+                            .push(Container::new(Text::new("SIMS IMS").size(30)).width(Fill).center_x())
+                            .push(Rule::horizontal(20))
+                            .push(TextInput::new("Username", &self.username, Message::UsernameInputChanged).padding(10))
+                            .push(TextInput::new("Password", password, Message::PasswordInputChanged).padding(10).password())
+                            .push(Rule::horizontal(20))
+                            .push(Button::new("Login").on_press(Message::LoginButtonClicked).width(Fill))
+                            .push(Container::new(Text::new(match error_message{Some(message)=>message, None=>""}).color(
+                            Color::from_rgba(1.0, 0.0, 0.0, 1.0)
+                        )).height(Length::Units(50)).center_x().center_y()
+                            )
+                            .width(Length::FillPortion(2)))
+                    .push(Space::with_width(Length::FillPortion(3)));
 
-                container(elements)
+                Container::new(elements)
                     .width(Fill)
                     .height(Fill)
                     .center_x()
@@ -191,7 +205,7 @@ impl Application for ClientState {
                     .into()
             },
             SimsClientState::Authenticating {..} => {
-                container("Logging In...")
+                Container::new("Logging In...")
                     .width(Fill)
                     .height(Fill)
                     .center_x()
@@ -200,15 +214,15 @@ impl Application for ClientState {
             }
             SimsClientState::InventoryView  => {
                 let page_content: Element<'_, Self::Message> = match self.current_tab.last().unwrap_or_default() {
-                    TabId::AllShelves => row![
-                        text("All shelves view"),
-                        Button::new("Meep").on_press(Message::OpenShelf(TabId::ShelfItems("shelf0".to_owned()))),
-                        Button::new("Meep2").on_press(Message::OpenShelf(TabId::ShelfItems("shelf1".to_owned())))
-                    ].into(),
-                    TabId::AllItems => text("All items view").into(),
+                    TabId::AllShelves => Row::new()
+                        .push(Text::new("All shelves view"))
+                        .push(Button::new("Meep").on_press(Message::OpenShelf(TabId::ShelfItems("shelf0".to_owned()))))
+                        .push(Button::new("Meep2").on_press(Message::OpenShelf(TabId::ShelfItems("shelf1".to_owned()))))
+                        .into(),
+                    TabId::AllItems => Text::new("All items view").into(),
                     TabId::ShelfItems (shelf_id) => {
                         let text_content = format!("Shelf Items view for shelf {}", shelf_id);
-                        text(text_content).into()
+                        Modal::new(true, Text::new(text_content), ||{Text::new("Modal!").into()}).into()
                     }
                 };
 
@@ -229,23 +243,19 @@ impl Application for ClientState {
 
                 Column::new()
                     .push(
-                    container(
+                    Container::new(
                             tabs
                         )
                         .width(Fill)
                         .height(Shrink)
                         .padding(5))
                     .push(
-                        container(page_content)
+                        Container::new(page_content)
                         .width(Fill)
                         .height(Fill)
                     ).into()
             }
-            _ => container(text(format!("Placeholder for state: {:?}", self.state))).width(Fill).height(Fill).center_x().center_y().into()
+            _ => Container::new(Text::new(format!("Placeholder for state: {:?}", self.state))).width(Fill).height(Fill).center_x().center_y().into()
         }
-    }
-
-    fn theme(&self) -> Self::Theme {
-        Theme::Dark
     }
 }

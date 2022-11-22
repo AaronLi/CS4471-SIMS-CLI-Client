@@ -1,17 +1,21 @@
 use crate::frontend::sims_ims_frontend::{LoginRequest, Token};
 use crate::frontend::LoginResult::{NotConnected, ServerError};
 use async_std::sync::Arc;
+use button::StyleSheet;
+use env_logger::fmt::Color;
 use iced::futures::lock::Mutex;
-use iced::widget::{container, Button, Svg, Row, Space, text, svg};
-use iced::{Element, Length, Renderer};
+use iced::pure::widget::{Button, button, Container, Row, Space, Svg, svg, Text};
+use iced::{Background, Element, Length, Renderer};
+use iced::button::Style;
 use iced::Length::{Fill, Shrink};
 use iced::widget::image::Handle;
 use sims_ims_frontend::sims_frontend_client::SimsFrontendClient;
-use tonic::transport::{Channel};
+use tonic::transport::Channel;
 use crate::assets::{BOOTSTRAP_FONT, CLOSE_ICON, get_icon};
 use crate::frontend::TabId::AllShelves;
 use crate::iced_messages::Message;
 use crate::iced_messages::Message::{CloseShelf, TabSelected};
+use crate::styles::TabCloseButton;
 
 pub mod sims_ims_frontend {
     tonic::include_proto!("sims_ims_frontend");
@@ -69,16 +73,16 @@ pub(crate) fn create_tab<'a>(tab_id: TabId, text_content: String, closeable: boo
             .push(Space::with_width(Length::Units(5)));
     }
 
-    button_display = button_display.push(text(text_content));
+    button_display = button_display.push(Text::new(text_content));
 
     if closeable {
         button_display = button_display.push(Space::with_width(Length::Units(5))).push(
-            Button::new(svg(svg::Handle::from_memory(CLOSE_ICON)).width(Length::Shrink)).on_press(CloseShelf(tab_id.clone()))
+            Button::new(Svg::new(svg::Handle::from_memory(CLOSE_ICON)).width(Length::Shrink)).on_press(CloseShelf(tab_id.clone())).style(TabCloseButton {})
         )
     }
 
     Button::new(
-        container(button_display)
+        Container::new(button_display)
         .width(Shrink)
         .height(Fill)
         .center_y(),
