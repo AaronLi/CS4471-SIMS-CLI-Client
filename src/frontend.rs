@@ -1,17 +1,21 @@
 use crate::frontend::sims_ims_frontend::{LoginRequest, Token};
 use crate::frontend::LoginResult::{NotConnected, ServerError};
 use async_std::sync::Arc;
+use button::StyleSheet;
+use env_logger::fmt::Color;
 use iced::futures::lock::Mutex;
-use iced::widget::{container, row, Button, Svg, Row, Space, text, button, svg};
-use iced::Length;
+use iced::pure::widget::{Button, button, Container, Row, Space, Svg, svg, Text};
+use iced::{Background, Element, Length, Renderer};
+use iced::button::Style;
 use iced::Length::{Fill, Shrink};
 use iced::widget::image::Handle;
 use sims_ims_frontend::sims_frontend_client::SimsFrontendClient;
-use tonic::transport::{Channel, Error};
-use crate::assets::CLOSE_ICON_SVG;
+use tonic::transport::Channel;
+use crate::assets::{BOOTSTRAP_FONT, CLOSE_ICON, get_icon};
 use crate::frontend::TabId::AllShelves;
 use crate::iced_messages::Message;
 use crate::iced_messages::Message::{CloseShelf, TabSelected};
+use crate::styles::TabCloseButton;
 
 pub mod sims_ims_frontend {
     tonic::include_proto!("sims_ims_frontend");
@@ -21,13 +25,22 @@ pub mod sims_ims_frontend {
 pub(crate) enum TabId {
     AllShelves,
     AllItems,
-    ShelfItems(String)
+    ShelfView(String)
 }
 
 impl Default for &TabId {
     fn default() -> Self {
         &AllShelves
     }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum EditTarget {
+    EditShelf{shelf_id: String},
+    EditItem{shelf_id: String, item_id: String},
+    EditSlot{shelf_id: String, slot_id: String},
+    NewItem{shelf_id: Option<String>},
+    NewShelf
 }
 
 #[derive(Debug, Clone)]
@@ -59,25 +72,26 @@ pub(crate) async fn login(
     response
 }
 
-pub(crate) fn create_tab<'a>(tab_id: TabId, text_content: String, closeable: bool, icon: Option<Svg>) -> Button<'a, Message> {
+pub(crate) fn create_tab<'a>(tab_id: TabId, text_content: String, closeable: bool, icon: Option<char>) -> Button<'a, Message> {
     let mut button_display = Row::new();
 
-    if let Some(svg) = icon {
+    if let Some(c) = icon {
+        let icon_image = get_icon(c);
         button_display = button_display
-            .push(svg.width(Shrink))
+            .push(icon_image)
             .push(Space::with_width(Length::Units(5)));
     }
 
-    button_display = button_display.push(text(text_content));
+    button_display = button_display.push(Text::new(text_content));
 
     if closeable {
         button_display = button_display.push(Space::with_width(Length::Units(5))).push(
-            Button::new(Svg::new(svg::Handle::from_memory(CLOSE_ICON_SVG)).width(Shrink)).on_press(CloseShelf(tab_id.clone()))
+            Button::new(Svg::new(svg::Handle::from_memory(CLOSE_ICON)).width(Length::Shrink)).on_press(CloseShelf(tab_id.clone())).style(TabCloseButton {})
         )
     }
 
     Button::new(
-        container(button_display)
+        Container::new(button_display)
         .width(Shrink)
         .height(Fill)
         .center_y(),
