@@ -687,9 +687,11 @@ dependencies = [
  "async-std",
  "env_logger",
  "iced",
+ "iced_aw",
  "image",
  "linked_hash_set",
  "log",
+ "num-traits",
  "prost",
  "tonic",
  "tonic-build",
@@ -1468,6 +1470,16 @@ dependencies = [
  "iced_winit",
  "image",
  "thiserror",
+]
+
+[[package]]
+name = "iced_aw"
+version = "0.2.0"
+source = "git+https://github.com/iced-rs/iced_aw?rev=c6a3bfd#c6a3bfdc4d01d28aeb433d42628e80a620f78bb3"
+dependencies = [
+ "iced_graphics",
+ "iced_native",
+ "iced_style",
 ]
 
 [[package]]
@@ -3567,7 +3579,7 @@ dependencies = [
  "js-sys",
  "log",
  "naga",
- "parking_lot 0.12.1",
+ "parking_lot 0.11.2",
  "raw-window-handle 0.5.0",
  "smallvec",
  "static_assertions",
@@ -3593,7 +3605,7 @@ dependencies = [
  "fxhash",
  "log",
  "naga",
- "parking_lot 0.12.1",
+ "parking_lot 0.11.2",
  "profiling",
  "raw-window-handle 0.5.0",
  "smallvec",
@@ -3629,7 +3641,7 @@ dependencies = [
  "metal",
  "naga",
  "objc",
- "parking_lot 0.12.1",
+ "parking_lot 0.11.2",
  "profiling",
  "range-alloc",
  "raw-window-handle 0.5.0",
