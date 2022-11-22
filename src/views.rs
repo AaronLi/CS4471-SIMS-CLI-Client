@@ -1,19 +1,19 @@
-use iced::pure::{Element, text};
-use iced::pure::widget::{Button, Column, Container, Image, Row, Text, TextInput};
-use iced::{Color, Length, Rule, Space};
+use iced::{Element, theme};
+use iced::widget::{Button, Column, Container, Image, Row, Text, TextInput, text, Rule, Space};
+use iced::{Length};
 use iced::Length::{Fill, Shrink};
-use iced::pure::widget::image as iced_image;
-use iced_aw::pure::{FloatingElement, Modal};
+use iced::widget::image as iced_image;
+use iced_aw::{Modal};
+use iced_aw::floating_element::FloatingElement;
 use crate::{assets, ClientState};
 use crate::assets::get_icon;
 use crate::frontend::{create_tab, EditTarget, TabId};
 use crate::frontend::EditTarget::{NewItem, NewShelf};
-use crate::iced_messages::Message;
-use crate::iced_messages::Message::{StartEditing, StopEditing};
-use crate::states::SimsClientState;
 use crate::styles::Fab;
+use crate::ui_messages::Message;
+use crate::ui_messages::Message::{StartEditing, StopEditing};
 
-pub(crate) fn unauthenticated_view<'a>(state: &ClientState, password: &String, error_message: &Option<String>) -> Element<'a, Message> {
+pub(crate) fn unauthenticated_view<'a>(state: &ClientState, password: &String, error_message: &'a Option<String>) -> Element<'a, Message> {
     let elements = Row::new()
                     .push(Space::with_width(Length::FillPortion(3)))
                     .push(
@@ -25,9 +25,7 @@ pub(crate) fn unauthenticated_view<'a>(state: &ClientState, password: &String, e
                             .push(TextInput::new("Password", password, Message::PasswordInputChanged).padding(10).password())
                             .push(Rule::horizontal(20))
                             .push(Button::new("Login").on_press(Message::LoginButtonClicked).width(Fill))
-                            .push(Container::new(Text::new(match error_message{Some(message)=>message, None=>""}).color(
-                            Color::from_rgba(1.0, 0.0, 0.0, 1.0)
-                        )).height(Length::Units(50)).center_x().center_y()
+                            .push(Container::new(Text::new(match error_message{Some(message)=>message, None=>""})).height(Length::Units(50)).center_x().center_y()
                             )
                             .width(Length::FillPortion(2)))
                     .push(Space::with_width(Length::FillPortion(3)));
@@ -86,8 +84,11 @@ pub(crate) fn inventory_view(state: &ClientState) -> Element<Message> {
                 Modal::new(state.edit_item.is_some(), FloatingElement::new(
                     Container::new(page).width(Fill).height(Fill),
                     || {
-                            let fab_color = iced::Color::from_rgb(1.0, 1.0, 1.0);
-                            Button::new(Container::new(get_icon('\u{F4FE}').color(fab_color).size(30)).width(Length::Fill).height(Length::Fill).center_x().center_y()).style(Fab{}).width(Length::Units(50)).height(Length::Units(50)).on_press(
+                            Button::new(Container::new(get_icon('\u{F4FE}').size(30)).width(Length::Fill).height(Length::Fill).center_x().center_y())
+                                .style(theme::Button::Custom(Box::new(Fab)))
+                                .width(Length::Units(50))
+                                .height(Length::Units(50))
+                                .on_press(
                                 match state.current_tab.last().unwrap_or_default() {
                                     TabId::AllShelves => StartEditing(NewShelf),
                                     TabId::AllItems => StartEditing(NewItem{shelf_id: None}),

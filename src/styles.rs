@@ -1,81 +1,32 @@
-use iced::{Background, button};
-use iced::button::Style;
+use iced::{Theme, theme};
+use iced::widget::{button};
+use iced::widget::button::Appearance;
 use num_traits::float::Float;
 
-pub struct TabCloseButton {
-
-}
-
-impl button::StyleSheet for TabCloseButton {
-    fn active(&self) -> Style {
-        button::Style{
-            shadow_offset: Default::default(),
-            background: None,
-            border_radius: 0.0,
-            border_width: 0.0,
-            border_color: Default::default(),
-            text_color: Default::default()
-        }
-    }
-
-    fn hovered(&self) -> Style {
-        button::Style{
-            shadow_offset: Default::default(),
-            background: None,
-            border_radius: 3.0,
-            border_width: 1.0,
-            border_color: iced::Color::from_rgb(0.7, 0.7, 0.7),
-            text_color: Default::default()
-        }
-    }
-
-    fn pressed(&self) -> Style {
-        Style{
-            shadow_offset: Default::default(),
-            background: Some(Background::Color(iced::Color::from_rgb(0.6, 0.6, 0.6))),
-            border_radius: 0.0,
-            border_width: 0.0,
-            border_color: Default::default(),
-            text_color: Default::default()
-        }
-    }
-}
-
-pub struct Fab { // Floating Action Button
-
-}
+#[derive(Default)]
+pub struct Fab; // Floating Action Button
 
 impl button::StyleSheet for Fab {
-    fn active(&self) -> Style {
-        button::Style{
-            shadow_offset: Default::default(),
-            background: Some(Background::Color(iced::Color::from_rgb(0.7, 0.6, 0.9))),
+    type Style = Theme;
+
+    fn active(&self, style: &Self::Style) -> Appearance {
+        Appearance{
             border_radius: f32::infinity(),
-            border_width: 0.0,
-            border_color: Default::default(),
-            text_color: Default::default()
+            ..style.active(&theme::Button::Primary)
         }
     }
 
-    fn hovered(&self) -> Style {
-        button::Style{
-            shadow_offset: Default::default(),
-            background: Some(Background::Color(iced::Color::from_rgb(0.6, 0.5, 0.8))),
+    fn hovered(&self, style: &Self::Style) -> Appearance {
+        Appearance{
             border_radius: f32::infinity(),
-            border_width: 0.0,
-            border_color: Default::default(),
-            text_color: Default::default()
+            ..style.hovered(&theme::Button::Primary)
         }
     }
 
-    fn pressed(&self) -> Style {
-        button::Style{
-            shadow_offset: Default::default(),
-            background: Some(Background::Color(iced::Color::from_rgb(0.5, 0.4, 0.7))),
+    fn pressed(&self, style: &Self::Style) -> Appearance {
+        Appearance{
             border_radius: f32::infinity(),
-            border_width: 0.0,
-            border_color: Default::default(),
-            text_color: Default::default()
+            ..style.pressed(&theme::Button::Primary)
         }
     }
 }
