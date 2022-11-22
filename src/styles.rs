@@ -1,5 +1,6 @@
 use iced::{Background, button};
 use iced::button::Style;
+use num_traits::float::Float;
 
 pub struct TabCloseButton {
 
@@ -33,6 +34,45 @@ impl button::StyleSheet for TabCloseButton {
             shadow_offset: Default::default(),
             background: Some(Background::Color(iced::Color::from_rgb(0.6, 0.6, 0.6))),
             border_radius: 0.0,
+            border_width: 0.0,
+            border_color: Default::default(),
+            text_color: Default::default()
+        }
+    }
+}
+
+pub struct Fab { // Floating Action Button
+
+}
+
+impl button::StyleSheet for Fab {
+    fn active(&self) -> Style {
+        button::Style{
+            shadow_offset: Default::default(),
+            background: Some(Background::Color(iced::Color::from_rgb(0.7, 0.6, 0.9))),
+            border_radius: f32::infinity(),
+            border_width: 0.0,
+            border_color: Default::default(),
+            text_color: Default::default()
+        }
+    }
+
+    fn hovered(&self) -> Style {
+        button::Style{
+            shadow_offset: Default::default(),
+            background: Some(Background::Color(iced::Color::from_rgb(0.6, 0.5, 0.8))),
+            border_radius: f32::infinity(),
+            border_width: 0.0,
+            border_color: Default::default(),
+            text_color: Default::default()
+        }
+    }
+
+    fn pressed(&self) -> Style {
+        button::Style{
+            shadow_offset: Default::default(),
+            background: Some(Background::Color(iced::Color::from_rgb(0.5, 0.4, 0.7))),
+            border_radius: f32::infinity(),
             border_width: 0.0,
             border_color: Default::default(),
             text_color: Default::default()

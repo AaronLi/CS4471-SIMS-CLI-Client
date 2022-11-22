@@ -25,13 +25,22 @@ pub mod sims_ims_frontend {
 pub(crate) enum TabId {
     AllShelves,
     AllItems,
-    ShelfItems(String)
+    ShelfView(String)
 }
 
 impl Default for &TabId {
     fn default() -> Self {
         &AllShelves
     }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum EditTarget {
+    EditShelf{shelf_id: String},
+    EditItem{shelf_id: String, item_id: String},
+    EditSlot{shelf_id: String, slot_id: String},
+    NewItem{shelf_id: Option<String>},
+    NewShelf
 }
 
 #[derive(Debug, Clone)]
