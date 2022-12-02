@@ -1,0 +1,87 @@
+@startuml
+'https://plantuml.com/class-diagram
+
+class iced::Application {
+    type Executor
+    type Message
+    type Theme
+    type Flags
+    new(flags: Flags) -> (Application, Command<Message>)
+    title(&self) -> String
+    update(&mut self, message: Message) -> Command<Message>
+    view(&self) -> Element<'_, Message, Renderer<Theme>>
+    {method} ...
+}
+
+struct ClientState {
+    Executor = executor::Default
+    Message = ui_messages::Message
+    Theme = iced::Theme
+    {field} Flags = ()
+    --
+    username: String
+    state: SimsClientState
+    rpc: Arc<Mutex<Option<SimsFrontendClient<Channel>>>>
+    token: Option<String>
+    current_tab: Vec<TabId>
+    tabs: LinkedHashSet<TabId>
+    edit_item: Option<EditTarget>
+}
+
+iced::Application <|-.- ClientState
+
+enum ui_messages::Message {
+    LoginButtonClicked
+    {field} UsernameInputChanged(String)
+    {field} PasswordInputChanged(String)
+    {field} Authenticated(Result<Token, LoginResult>)
+    {field} TabSelected(TabId)
+    {field} CloseShelf(TabId)
+    {field} OpenShelf(TabId)
+    {field} StartEditing(EditTarget)
+    StopEditing
+}
+
+ClientState --> ui_messages::Message
+
+enum TabId {
+    AllShelves
+    AllItems
+    {field} ShelfView(String)
+}
+ui_messages::Message --> TabId
+ClientState --> TabId
+
+enum EditTarget {
+    EditShelf{shelf_id: String}
+    EditItem{shelf_id: String, item_id: String}
+    EditSlot{shelf_id: String, slot_id: String}
+    NewItem{shelf_id:Option<String>}
+    NewShelf
+}
+
+ui_messages::Message --> EditTarget
+ClientState --> EditTarget
+
+enum SimsClientState {
+    Unauthenticated{password: String, error_message: Option<String>}
+    Authenticating
+    InventoryView
+    AwaitDatabaseConfirmation
+    DisplaySuggestions{suggestion: String}
+}
+
+ClientState --> SimsClientState
+
+enum LoginResult {
+    {field} ServerError(tonic::Status)
+    NotConnected
+}
+ui_messages::Message --> LoginResult
+
+struct SimsFrontendClient {
+    Generated from Protobuf
+}
+
+ClientState --> SimsFrontendClient
+@enduml

@@ -1,6 +1,6 @@
-
 use async_std::sync::Arc;
 use env_logger::Builder;
+use std::env::set_var;
 use iced::{Application, Command, Element, executor, Theme, window};
 use iced::futures::lock::Mutex;
 use iced::Length::{Fill};
@@ -32,6 +32,8 @@ pub fn main() -> iced::Result {
     Builder::new()
         .filter_module("cs4471_sims_cli_client", LevelFilter::Debug)
         .init();
+
+    set_var("WGPU_BACKEND", "vulkan");
     ClientState::run(iced::Settings {
         window: window::Settings {
             icon: match logo_bytes() {
