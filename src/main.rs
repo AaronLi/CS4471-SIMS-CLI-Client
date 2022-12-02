@@ -13,11 +13,12 @@ use log::{debug, info, LevelFilter};
 use tonic::transport::Channel;
 
 use crate::assets::logo_bytes;
-use crate::frontend::{EditTarget, LoginResult, TabId};
+use crate::frontend::{EditTarget, LoginResult, RpcCallResult, TabId};
+use crate::frontend::sims_ims_frontend::{ShelfInfo, Shelves};
 use crate::frontend::sims_ims_frontend::sims_frontend_client::SimsFrontendClient;
 use crate::states::SimsClientState;
 use crate::ui_messages::Message;
-use crate::ui_messages::Message::{StartEditing, StopEditing};
+use crate::ui_messages::Message::{StartEditing, StopEditing, UpdatedShelves};
 
 mod assets;
 mod frontend;
@@ -55,6 +56,7 @@ struct ClientState {
     current_tab: Vec<TabId>,
     tabs: LinkedHashSet<TabId>,
     edit_item: Option<EditTarget>,
+    shelves: Vec<ShelfInfo>
 }
 
 impl Application for ClientState {
@@ -75,6 +77,7 @@ impl Application for ClientState {
             current_tab: Vec::new(),
             tabs: LinkedHashSet::new(),
             edit_item: None,
+            shelves: Vec::new()
         };
 
         new_client.tabs.insert(TabId::AllShelves);
@@ -133,8 +136,10 @@ impl Application for ClientState {
 
                         if matches!(self.state, SimsClientState::Authenticating { .. }) {
                             self.state = SimsClientState::InventoryView;
+                            Command::perform(frontend::read_shelves(Arc::clone(&self.rpc), None, self.username.clone(), self.token.as_ref().unwrap().clone()), UpdatedShelves)
+                        }else {
+                            Command::none()
                         }
-                        Command::none()
                     }
                     Err(err) => {
                         info!("Failed to log in {:?}", err);
@@ -186,6 +191,13 @@ impl Application for ClientState {
             }
             StartEditing(target) => {
                 self.edit_item = Some(target);
+                Command::none()
+            }
+            UpdatedShelves(shelves) => {
+                match shelves {
+                    Ok(s) => {self.shelves = s.shelves;}
+                    Err(e) => println!("{:?}", e)
+                }
                 Command::none()
             }
         }

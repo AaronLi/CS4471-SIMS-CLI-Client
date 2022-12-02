@@ -1,5 +1,5 @@
 use iced::{Element, theme};
-use iced::widget::{Button, Column, Container, Image, Row, Text, TextInput, text, Rule, Space};
+use iced::widget::{Button, Column, Container, Image, Row, Text, TextInput, text, Rule, Space, Scrollable, column, row};
 use iced::{Length};
 use iced::Length::{Fill, Shrink};
 use iced::widget::image as iced_image;
@@ -48,7 +48,16 @@ pub(crate) fn inventory_view(state: &ClientState) -> Element<Message> {
                     TabId::AllItems => Text::new("All items view").into(),
                     TabId::ShelfView(shelf_id) => {
                         let text_content = format!("Shelf Items view for shelf {}", shelf_id);
-                        Text::new(text_content).into()
+                        Scrollable::new(
+                            column(
+                                state.shelves.iter()
+                                    .map(|s|row![
+                                        Text::new(s.shelf_id.clone()),
+                                        Text::new(format!("Slots: {}", s.shelf_count))
+                                    ].into())
+                                    .collect()
+                            )
+                        ).into()
                     }
                 };
 
