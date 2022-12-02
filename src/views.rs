@@ -25,6 +25,8 @@ pub(crate) fn unauthenticated_view<'a>(state: &ClientState, password: &String, e
                             .push(TextInput::new("Password", password, Message::PasswordInputChanged).padding(10).password())
                             .push(Rule::horizontal(20))
                             .push(Button::new("Login").on_press(Message::LoginButtonClicked).width(Fill))
+                            .push(Space::with_height(Length::Units(3)))
+                            .push(Button::new("Register & Login").on_press(Message::RegisterButtonClicked).width(Fill))
                             .push(Container::new(Text::new(match error_message{Some(message)=>message, None=>""})).height(Length::Units(50)).center_x().center_y()
                             )
                             .width(Length::FillPortion(2)))

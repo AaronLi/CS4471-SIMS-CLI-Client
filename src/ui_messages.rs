@@ -5,6 +5,7 @@ use crate::frontend::sims_ims_frontend::{ShelfInfo, Shelves, Token};
 #[derive(Debug, Clone)]
 pub(crate) enum Message {
     LoginButtonClicked,
+    RegisterButtonClicked,
     UsernameInputChanged(String),
     PasswordInputChanged(String),
     Authenticated(Result<Token, LoginResult>),

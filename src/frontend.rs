@@ -1,5 +1,5 @@
 use crate::frontend::sims_ims_frontend::{GetShelvesRequest, LoginRequest, Shelves, Token};
-use crate::frontend::LoginResult::{NotConnected, ServerError};
+use crate::frontend::LoginResult::{NotConnected, RegisterFailed, ServerError};
 use async_std::sync::Arc;
 use iced::futures::lock::Mutex;
 use iced::widget::{Button, Container, Row, Space, Svg, svg, Text};
@@ -45,6 +45,7 @@ pub(crate) enum EditTarget {
 pub(crate) enum LoginResult {
     ServerError(tonic::Status),
     NotConnected,
+    RegisterFailed
 }
 
 #[derive(Debug, Clone)]
@@ -75,6 +76,35 @@ pub(crate) async fn login(
 
     response
 }
+
+pub(crate) async fn register_and_login(
+    rpc: Arc<Mutex<Option<SimsFrontendClient<Channel>>>>,
+    address: String,
+    username: String,
+    password: String,
+) -> Result<Token, LoginResult> {
+    let mut rpc_present = match rpc.lock().await.take() {
+        None => SimsFrontendClient::connect(address)
+            .await
+            .map_err(|_| NotConnected)?,
+        Some(client_rpc) => client_rpc,
+    };
+
+    let _register_response = rpc_present.sign_up(LoginRequest{
+        username: username.clone(),
+        password: password.clone(),
+    }).await.map_err(|_|RegisterFailed)?;
+
+    let response = rpc_present
+        .cred_auth(LoginRequest { username, password })
+        .await
+        .map(|x| x.into_inner())
+        .map_err(|e| ServerError(e));
+    let _ = rpc.lock().await.insert(rpc_present);
+
+    response
+}
+
 
 pub(crate) fn create_tab<'a>(tab_id: TabId, text_content: String, closeable: bool, icon: Option<char>) -> Button<'a, Message> {
     let mut button_display = Row::new();

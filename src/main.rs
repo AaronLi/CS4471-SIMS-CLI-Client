@@ -127,7 +127,26 @@ impl Application for ClientState {
                     // login button clicked in non-login screen
                     Command::none()
                 }
-            }
+            },
+            Message::RegisterButtonClicked => {
+                if let SimsClientState::Unauthenticated { ref password, .. } = self.state {
+                    let client_ = Arc::clone(&self.rpc);
+                    let ret = Command::perform(
+                        frontend::register_and_login(
+                            client_,
+                            SERVER_ADDRESS.to_owned(),
+                            self.username.to_owned(),
+                            password.to_owned(),
+                        ),
+                        Message::Authenticated,
+                    );
+                    self.state = SimsClientState::Authenticating;
+                    ret
+                } else {
+                    // login button clicked in non-login screen
+                    Command::none()
+                }
+            },
             Message::Authenticated(authentication_result) => {
                 match authentication_result {
                     Ok(response) => {
@@ -150,6 +169,9 @@ impl Application for ClientState {
                                 LoginResult::ServerError(e) => format!("Placeholder: {:?}", e), //TODO: fill in text
                                 LoginResult::NotConnected => {
                                     "Could not connect to server".to_owned()
+                                },
+                                LoginResult::RegisterFailed => {
+                                    "Failed to register".to_owned()
                                 }
                             }),
                         };
