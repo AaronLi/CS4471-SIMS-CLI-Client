@@ -1,5 +1,5 @@
 use iced::{Element, theme};
-use iced::widget::{Button, Column, Container, Image, Row, Text, TextInput, text, Rule, Space, Scrollable, column, row};
+use iced::widget::{Button, Column, Container, Image, Row, Text, TextInput, text, Rule, Space, Scrollable, column, row, button};
 use iced::{Length};
 use iced::Length::{Fill, Shrink};
 use iced::widget::image as iced_image;
@@ -11,7 +11,7 @@ use crate::frontend::{create_tab, EditTarget, TabId};
 use crate::frontend::EditTarget::{NewItem, NewShelf};
 use crate::styles::Fab;
 use crate::ui_messages::Message;
-use crate::ui_messages::Message::{StartEditing, StopEditing};
+use crate::ui_messages::Message::{StartEditing, StopEditing, UpdateShelves};
 
 pub(crate) fn unauthenticated_view<'a>(state: &ClientState, password: &String, error_message: &'a Option<String>) -> Element<'a, Message> {
     let elements = Row::new()
@@ -42,15 +42,12 @@ pub(crate) fn unauthenticated_view<'a>(state: &ClientState, password: &String, e
 
 pub(crate) fn inventory_view(state: &ClientState) -> Element<Message> {
     let page_content: Element<'_, Message> = match state.current_tab.last().unwrap_or_default() {
-                    TabId::AllShelves => Row::new()
+                    TabId::AllShelves => Column::new().push(Row::new()
                         .push(Text::new("All shelves view"))
                         .push(Button::new("Meep").on_press(Message::OpenShelf(TabId::ShelfView("shelf0".to_owned()))))
-                        .push(Button::new("Meep2").on_press(Message::OpenShelf(TabId::ShelfView("shelf1".to_owned()))))
-                        .into(),
-                    TabId::AllItems => Text::new("All items view").into(),
-                    TabId::ShelfView(shelf_id) => {
-                        let text_content = format!("Shelf Items view for shelf {}", shelf_id);
-                        Scrollable::new(
+                        .push(Button::new("Meep2").on_press(Message::OpenShelf(TabId::ShelfView("shelf1".to_owned())))
+                        )).push(
+                            Scrollable::new(
                             column(
                                 state.shelves.iter()
                                     .map(|s|row![
@@ -59,11 +56,16 @@ pub(crate) fn inventory_view(state: &ClientState) -> Element<Message> {
                                     ].into())
                                     .collect()
                             )
-                        ).into()
+                    ))
+                        .into(),
+                    TabId::AllItems => Text::new("All items view").into(),
+                    TabId::ShelfView(shelf_id) => {
+                        let text_content = format!("Shelf Items view for shelf {}", shelf_id);
+                        text(text_content).into()
                     }
                 };
 
-                let tabs = state.tabs.iter()
+                let mut tabs = state.tabs.iter()
                     .map(| tab_info| match tab_info {
                         TabId::AllShelves => create_tab(tab_info.clone(), "Shelves".to_owned(), false, Some('\u{F685}')),
                         TabId::AllItems => create_tab(tab_info.clone(), "Items".to_owned(), false, Some('\u{F7D3}')),
@@ -76,7 +78,14 @@ pub(crate) fn inventory_view(state: &ClientState) -> Element<Message> {
                         |tabs_container, tab|{
                             tabs_container.push(Space::with_width(Length::Units(2))).push(tab)
                         }
-                    );
+                    ).push(Space::with_width(Length::Fill));
+
+                tabs = match state.current_tab.last().unwrap_or_default() {
+                    TabId::AllShelves => tabs.push(
+                    button(get_icon('\u{F116}')).on_press(UpdateShelves)
+                    ),
+                    _=> tabs
+                };
 
                 let page = Column::new()
                     .push(

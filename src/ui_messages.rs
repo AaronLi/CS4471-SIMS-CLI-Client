@@ -14,5 +14,6 @@ pub(crate) enum Message {
     OpenShelf(TabId),
     StartEditing(EditTarget),
     StopEditing,
-    UpdatedShelves(Result<Shelves, RpcCallResult>)
+    UpdatedShelves(Result<Shelves, RpcCallResult>),
+    UpdateShelves
 }

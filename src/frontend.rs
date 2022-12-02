@@ -137,14 +137,13 @@ pub(crate) fn create_tab<'a>(tab_id: TabId, text_content: String, closeable: boo
 
 
 pub(crate) async fn read_shelves(rpc: Arc<Mutex<Option<SimsFrontendClient<Channel>>>>, shelf_id: Option<String>, username: String, token: String) -> Result<Shelves, RpcCallResult> {
-    let mut rpc_present = match rpc.lock().await.take() {
+    match rpc.lock().await.as_mut() {
         None => return Err(RpcCallResult::NotConnected),
-        Some(client_rpc) => client_rpc,
-    };
-
-    rpc_present.get_shelves(GetShelvesRequest{
-        shelf_id,
-        username: username.to_owned(),
-        token: token.to_owned(),
-    }).await.map_err(|e|RpcCallResult::CallFailed(e.to_string())).map(|r|r.into_inner())
+        Some(client_rpc) => client_rpc.get_shelves(GetShelvesRequest{
+            shelf_id,
+            username: username.to_owned(),
+            token: token.to_owned()})
+            .await
+            .map_err(|e|RpcCallResult::CallFailed(e.to_string())).map(|r|r.into_inner()),
+    }
 }

@@ -34,7 +34,9 @@ pub fn main() -> iced::Result {
         .filter_module("cs4471_sims_cli_client", LevelFilter::Debug)
         .init();
 
-    set_var("WGPU_BACKEND", "vulkan");
+    if !cfg!(macos) {
+        set_var("WGPU_BACKEND", "vulkan");
+    }
     ClientState::run(iced::Settings {
         window: window::Settings {
             icon: match logo_bytes() {
@@ -91,6 +93,9 @@ impl Application for ClientState {
 
     fn update(&mut self, message: Self::Message) -> Command<Message> {
         match message {
+            Message::UpdateShelves => {
+                Command::perform(frontend::read_shelves(Arc::clone(&self.rpc), None, self.username.clone(), self.token.as_ref().unwrap().clone()), UpdatedShelves)
+            }
             Message::UsernameInputChanged(s) => {
                 if let SimsClientState::Unauthenticated { .. } = self.state {
                     self.username = s
