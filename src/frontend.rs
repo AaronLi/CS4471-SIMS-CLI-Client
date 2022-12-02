@@ -1,14 +1,17 @@
-use crate::frontend::sims_ims_frontend::{LoginRequest, Token};
-use crate::frontend::LoginResult::{NotConnected, ServerError};
+use crate::frontend::sims_ims_frontend::{GetShelvesRequest, LoginRequest, Shelves, Token};
+use crate::frontend::LoginResult::{NotConnected, RegisterFailed, ServerError};
 use async_std::sync::Arc;
 use iced::futures::lock::Mutex;
 use iced::widget::{Button, Container, Row, Space, Svg, svg, Text};
-use iced::{Length};
+use iced::{Length, Subscription, subscription};
+use iced::futures::{StreamExt, TryStreamExt};
 use iced::Length::{Fill, Shrink};
+use tonic::codegen::Body;
 use sims_ims_frontend::sims_frontend_client::SimsFrontendClient;
 use tonic::transport::Channel;
 use crate::assets::{CLOSE_ICON, get_icon};
 use crate::frontend::TabId::AllShelves;
+use crate::ui_messages;
 use crate::ui_messages::Message;
 use crate::ui_messages::Message::{CloseShelf, TabSelected};
 
@@ -42,6 +45,13 @@ pub(crate) enum EditTarget {
 pub(crate) enum LoginResult {
     ServerError(tonic::Status),
     NotConnected,
+    RegisterFailed
+}
+
+#[derive(Debug, Clone)]
+pub enum RpcCallResult {
+    NotConnected,
+    CallFailed(String)
 }
 
 pub(crate) async fn login(
@@ -66,6 +76,35 @@ pub(crate) async fn login(
 
     response
 }
+
+pub(crate) async fn register_and_login(
+    rpc: Arc<Mutex<Option<SimsFrontendClient<Channel>>>>,
+    address: String,
+    username: String,
+    password: String,
+) -> Result<Token, LoginResult> {
+    let mut rpc_present = match rpc.lock().await.take() {
+        None => SimsFrontendClient::connect(address)
+            .await
+            .map_err(|_| NotConnected)?,
+        Some(client_rpc) => client_rpc,
+    };
+
+    let _register_response = rpc_present.sign_up(LoginRequest{
+        username: username.clone(),
+        password: password.clone(),
+    }).await.map_err(|_|RegisterFailed)?;
+
+    let response = rpc_present
+        .cred_auth(LoginRequest { username, password })
+        .await
+        .map(|x| x.into_inner())
+        .map_err(|e| ServerError(e));
+    let _ = rpc.lock().await.insert(rpc_present);
+
+    response
+}
+
 
 pub(crate) fn create_tab<'a>(tab_id: TabId, text_content: String, closeable: bool, icon: Option<char>) -> Button<'a, Message> {
     let mut button_display = Row::new();
@@ -94,4 +133,17 @@ pub(crate) fn create_tab<'a>(tab_id: TabId, text_content: String, closeable: boo
     .width(Shrink)
     .height(Length::Units(30))
         .on_press(TabSelected(tab_id))
+}
+
+
+pub(crate) async fn read_shelves(rpc: Arc<Mutex<Option<SimsFrontendClient<Channel>>>>, shelf_id: Option<String>, username: String, token: String) -> Result<Shelves, RpcCallResult> {
+    match rpc.lock().await.as_mut() {
+        None => return Err(RpcCallResult::NotConnected),
+        Some(client_rpc) => client_rpc.get_shelves(GetShelvesRequest{
+            shelf_id,
+            username: username.to_owned(),
+            token: token.to_owned()})
+            .await
+            .map_err(|e|RpcCallResult::CallFailed(e.to_string())).map(|r|r.into_inner()),
+    }
 }

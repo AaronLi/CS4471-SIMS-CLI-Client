@@ -13,11 +13,12 @@ use log::{debug, info, LevelFilter};
 use tonic::transport::Channel;
 
 use crate::assets::logo_bytes;
-use crate::frontend::{EditTarget, LoginResult, TabId};
+use crate::frontend::{EditTarget, LoginResult, RpcCallResult, TabId};
+use crate::frontend::sims_ims_frontend::{ShelfInfo, Shelves};
 use crate::frontend::sims_ims_frontend::sims_frontend_client::SimsFrontendClient;
 use crate::states::SimsClientState;
 use crate::ui_messages::Message;
-use crate::ui_messages::Message::{StartEditing, StopEditing};
+use crate::ui_messages::Message::{StartEditing, StopEditing, UpdatedShelves};
 
 mod assets;
 mod frontend;
@@ -33,7 +34,9 @@ pub fn main() -> iced::Result {
         .filter_module("cs4471_sims_cli_client", LevelFilter::Debug)
         .init();
 
-    set_var("WGPU_BACKEND", "vulkan");
+    if !cfg!(macos) {
+        set_var("WGPU_BACKEND", "vulkan");
+    }
     ClientState::run(iced::Settings {
         window: window::Settings {
             icon: match logo_bytes() {
@@ -55,6 +58,7 @@ struct ClientState {
     current_tab: Vec<TabId>,
     tabs: LinkedHashSet<TabId>,
     edit_item: Option<EditTarget>,
+    shelves: Vec<ShelfInfo>
 }
 
 impl Application for ClientState {
@@ -75,6 +79,7 @@ impl Application for ClientState {
             current_tab: Vec::new(),
             tabs: LinkedHashSet::new(),
             edit_item: None,
+            shelves: Vec::new()
         };
 
         new_client.tabs.insert(TabId::AllShelves);
@@ -88,6 +93,9 @@ impl Application for ClientState {
 
     fn update(&mut self, message: Self::Message) -> Command<Message> {
         match message {
+            Message::UpdateShelves => {
+                Command::perform(frontend::read_shelves(Arc::clone(&self.rpc), None, self.username.clone(), self.token.as_ref().unwrap().clone()), UpdatedShelves)
+            }
             Message::UsernameInputChanged(s) => {
                 if let SimsClientState::Unauthenticated { .. } = self.state {
                     self.username = s
@@ -124,7 +132,26 @@ impl Application for ClientState {
                     // login button clicked in non-login screen
                     Command::none()
                 }
-            }
+            },
+            Message::RegisterButtonClicked => {
+                if let SimsClientState::Unauthenticated { ref password, .. } = self.state {
+                    let client_ = Arc::clone(&self.rpc);
+                    let ret = Command::perform(
+                        frontend::register_and_login(
+                            client_,
+                            SERVER_ADDRESS.to_owned(),
+                            self.username.to_owned(),
+                            password.to_owned(),
+                        ),
+                        Message::Authenticated,
+                    );
+                    self.state = SimsClientState::Authenticating;
+                    ret
+                } else {
+                    // login button clicked in non-login screen
+                    Command::none()
+                }
+            },
             Message::Authenticated(authentication_result) => {
                 match authentication_result {
                     Ok(response) => {
@@ -133,8 +160,10 @@ impl Application for ClientState {
 
                         if matches!(self.state, SimsClientState::Authenticating { .. }) {
                             self.state = SimsClientState::InventoryView;
+                            Command::perform(frontend::read_shelves(Arc::clone(&self.rpc), None, self.username.clone(), self.token.as_ref().unwrap().clone()), UpdatedShelves)
+                        }else {
+                            Command::none()
                         }
-                        Command::none()
                     }
                     Err(err) => {
                         info!("Failed to log in {:?}", err);
@@ -145,6 +174,9 @@ impl Application for ClientState {
                                 LoginResult::ServerError(e) => format!("Placeholder: {:?}", e), //TODO: fill in text
                                 LoginResult::NotConnected => {
                                     "Could not connect to server".to_owned()
+                                },
+                                LoginResult::RegisterFailed => {
+                                    "Failed to register".to_owned()
                                 }
                             }),
                         };
@@ -186,6 +218,13 @@ impl Application for ClientState {
             }
             StartEditing(target) => {
                 self.edit_item = Some(target);
+                Command::none()
+            }
+            UpdatedShelves(shelves) => {
+                match shelves {
+                    Ok(s) => {self.shelves = s.shelves;}
+                    Err(e) => println!("{:?}", e)
+                }
                 Command::none()
             }
         }

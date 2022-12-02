@@ -1,9 +1,11 @@
-use crate::frontend::{EditTarget, LoginResult, TabId};
-use crate::frontend::sims_ims_frontend::Token;
+use std::sync::mpsc;
+use crate::frontend::{EditTarget, LoginResult, RpcCallResult, TabId};
+use crate::frontend::sims_ims_frontend::{ShelfInfo, Shelves, Token};
 
 #[derive(Debug, Clone)]
 pub(crate) enum Message {
     LoginButtonClicked,
+    RegisterButtonClicked,
     UsernameInputChanged(String),
     PasswordInputChanged(String),
     Authenticated(Result<Token, LoginResult>),
@@ -11,5 +13,7 @@ pub(crate) enum Message {
     CloseShelf(TabId),
     OpenShelf(TabId),
     StartEditing(EditTarget),
-    StopEditing
+    StopEditing,
+    UpdatedShelves(Result<Shelves, RpcCallResult>),
+    UpdateShelves
 }
