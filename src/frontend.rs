@@ -1,4 +1,4 @@
-use crate::frontend::sims_ims_frontend::{GetShelvesRequest, LoginRequest, Shelves, Token};
+use crate::frontend::sims_ims_frontend::{ActionApproved, CreateShelfRequest, GetItemRequest, GetItemsRequest, GetShelvesRequest, Items, LoginRequest, ShelfInfo, Shelves, Token};
 use crate::frontend::LoginResult::{NotConnected, RegisterFailed, ServerError};
 use async_std::sync::Arc;
 use iced::futures::lock::Mutex;
@@ -38,7 +38,7 @@ pub(crate) enum EditTarget {
     EditItem{shelf_id: String, item_id: String},
     EditSlot{shelf_id: String, slot_id: String},
     NewItem{shelf_id: Option<String>},
-    NewShelf
+    NewShelf{shelf_name: String, slots: String, error_message: Option<String>}
 }
 
 #[derive(Debug, Clone)]
@@ -52,6 +52,12 @@ pub(crate) enum LoginResult {
 pub enum RpcCallResult {
     NotConnected,
     CallFailed(String)
+}
+
+#[derive(Debug, Clone)]
+pub enum GetItemsResponse {
+    AllItems(Items),
+    ShelfItems(String, Items)
 }
 
 pub(crate) async fn login(
@@ -137,14 +143,40 @@ pub(crate) fn create_tab<'a>(tab_id: TabId, text_content: String, closeable: boo
 
 
 pub(crate) async fn read_shelves(rpc: Arc<Mutex<Option<SimsFrontendClient<Channel>>>>, shelf_id: Option<String>, username: String, token: String) -> Result<Shelves, RpcCallResult> {
-    let mut rpc_present = match rpc.lock().await.take() {
+    match rpc.lock().await.as_mut() {
         None => return Err(RpcCallResult::NotConnected),
-        Some(client_rpc) => client_rpc,
-    };
+        Some(client_rpc) => client_rpc.get_shelves(GetShelvesRequest{
+            shelf_id,
+            username: username.to_owned(),
+            token: token.to_owned()})
+            .await
+            .map_err(|e|RpcCallResult::CallFailed(e.to_string())).map(|r|r.into_inner()),
+    }
+}
 
-    rpc_present.get_shelves(GetShelvesRequest{
-        shelf_id,
-        username: username.to_owned(),
-        token: token.to_owned(),
-    }).await.map_err(|e|RpcCallResult::CallFailed(e.to_string())).map(|r|r.into_inner())
+pub(crate) async fn read_items(rpc: Arc<Mutex<Option<SimsFrontendClient<Channel>>>>, shelf_id: Option<String>, username: String, token: String) -> Result<GetItemsResponse, RpcCallResult> {
+    match rpc.lock().await.as_mut() {
+        None => return Err(RpcCallResult::NotConnected),
+        Some(client_rpc) => client_rpc.get_items(GetItemsRequest{
+            shelf_id: shelf_id.clone(),
+            username: username.to_owned(),
+            token: token.to_owned()})
+            .await
+            .map_err(|e|RpcCallResult::CallFailed(e.to_string())).map(|r|
+            match shelf_id {
+                Some(shelf)=> GetItemsResponse::ShelfItems(shelf, r.into_inner()),
+                None => GetItemsResponse::AllItems(r.into_inner())
+            }),
+    }
+}
+
+pub(crate) async fn create_shelf(rpc: Arc<Mutex<Option<SimsFrontendClient<Channel>>>>, shelf_id: String, num_slots: u32, username: String, token: String) -> Result<ActionApproved, RpcCallResult> {
+    match rpc.lock().await.as_mut() {
+        None => return Err(RpcCallResult::NotConnected),
+        Some(client_rpc) => client_rpc.create_shelf(CreateShelfRequest{
+            username,
+            token,
+            shelfinfo: Some(ShelfInfo{ shelf_id, shelf_count: num_slots }),
+        }).await.map_err(|e|RpcCallResult::CallFailed(e.to_string())).map(|r|r.into_inner())
+    }
 }

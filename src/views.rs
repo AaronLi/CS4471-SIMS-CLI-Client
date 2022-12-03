@@ -1,17 +1,18 @@
 use iced::{Element, theme};
-use iced::widget::{Button, Column, Container, Image, Row, Text, TextInput, text, Rule, Space, Scrollable, column, row};
+use iced::widget::{Button, Column, Container, Image, Row, Text, TextInput, text, Rule, Space, Scrollable, column, row, button};
 use iced::{Length};
 use iced::Length::{Fill, Shrink};
 use iced::widget::image as iced_image;
-use iced_aw::{Modal};
+use iced_aw::{Modal, Card};
 use iced_aw::floating_element::FloatingElement;
-use crate::{assets, ClientState};
+use std::iter;
+use crate::{assets, ClientState, ui_messages};
 use crate::assets::get_icon;
 use crate::frontend::{create_tab, EditTarget, TabId};
 use crate::frontend::EditTarget::{NewItem, NewShelf};
 use crate::styles::Fab;
 use crate::ui_messages::Message;
-use crate::ui_messages::Message::{StartEditing, StopEditing};
+use crate::ui_messages::Message::{StartEditing, StopEditing, UpdateItems, UpdateShelves};
 
 pub(crate) fn unauthenticated_view<'a>(state: &ClientState, password: &String, error_message: &'a Option<String>) -> Element<'a, Message> {
     let elements = Row::new()
@@ -42,84 +43,189 @@ pub(crate) fn unauthenticated_view<'a>(state: &ClientState, password: &String, e
 
 pub(crate) fn inventory_view(state: &ClientState) -> Element<Message> {
     let page_content: Element<'_, Message> = match state.current_tab.last().unwrap_or_default() {
-                    TabId::AllShelves => Row::new()
-                        .push(Text::new("All shelves view"))
-                        .push(Button::new("Meep").on_press(Message::OpenShelf(TabId::ShelfView("shelf0".to_owned()))))
-                        .push(Button::new("Meep2").on_press(Message::OpenShelf(TabId::ShelfView("shelf1".to_owned()))))
-                        .into(),
-                    TabId::AllItems => Text::new("All items view").into(),
-                    TabId::ShelfView(shelf_id) => {
-                        let text_content = format!("Shelf Items view for shelf {}", shelf_id);
-                        Scrollable::new(
-                            column(
-                                state.shelves.iter()
-                                    .map(|s|row![
-                                        Text::new(s.shelf_id.clone()),
-                                        Text::new(format!("Slots: {}", s.shelf_count))
-                                    ].into())
-                                    .collect()
-                            )
-                        ).into()
+    TabId::AllShelves => Column::new().push(Row::new()
+        .push(Container::new(Text::new("My Shelves").size(30)).width(Length::Fill).center_x()))
+        .push(row![
+            Text::new("Name").width(Length::FillPortion(3)),
+            Text::new("# of Slots").width(Length::FillPortion(3)),
+            Text::new("Actions").width(Length::FillPortion(1))
+        ])
+        .push(Rule::horizontal(2))
+        .push( // list all shelves
+            Scrollable::new(
+
+                state.shelves.iter()
+                    .fold(Column::new(), |c, s|c.push(Container::new(row![
+                        Text::new(s.shelf_id.clone()).width(Length::FillPortion(3)),
+                        Text::new(format!("Slots: {}", s.shelf_count)).width(Length::FillPortion(3)),
+                        Container::new(Button::new("Open").on_press(Message::OpenShelf(TabId::ShelfView(s.shelf_id.clone()))).width(Length::Shrink)).width(Length::FillPortion(1))
+                    ]).height(Length::Units(40)).center_y()))
+            )
+    ).into(),
+    TabId::AllItems => {
+        Column::new()
+            .push(Container::new(
+                text("All Items").size(30)
+            ).width(Length::Fill).center_x()
+
+            )
+            .push(
+            row![
+                    text("Item").width(Length::FillPortion(1)),
+                    // Rule::vertical(2),
+                    text("Description").width(Length::FillPortion(3)),
+                    text("Shelf").width(Length::FillPortion(1)),
+                    // Rule::vertical(2),
+                    text("Price").width(Length::FillPortion(1)),
+                    // Rule::vertical(2),
+                    text("Stock").width(Length::FillPortion(1))
+                ].height(Length::Shrink)
+            ).push(
+                Rule::horizontal(2)
+            ).push(
+        Scrollable::new(state.all_items.iter().flat_map(|(k, v)|v.iter().zip(iter::repeat(k))).map(
+                    |(item, shelf)|{
+                        Container::new(row![
+                            text(item.object_id.clone()).width(Length::FillPortion(1)),
+                            // Rule::vertical(2),
+                            text(item.description.clone()).width(Length::FillPortion(3)),
+                            text(shelf.clone()).width(Length::FillPortion(1)),
+                            // Rule::vertical(2),
+                            text(item.price).width(Length::FillPortion(1)),
+                            // Rule::vertical(2),
+                            text(item.stock).width(Length::FillPortion(1))
+                        ]).height(Length::Units(40)).center_y()
                     }
-                };
-
-                let tabs = state.tabs.iter()
-                    .map(| tab_info| match tab_info {
-                        TabId::AllShelves => create_tab(tab_info.clone(), "Shelves".to_owned(), false, Some('\u{F685}')),
-                        TabId::AllItems => create_tab(tab_info.clone(), "Items".to_owned(), false, Some('\u{F7D3}')),
-                        TabId::ShelfView(shelf_id) => {
-                            create_tab(tab_info.clone(), shelf_id.clone(), true, Some('\u{F1C8}'))
-                        }
-                    })
-                    .fold(
-                        Row::new(),
-                        |tabs_container, tab|{
-                            tabs_container.push(Space::with_width(Length::Units(2))).push(tab)
-                        }
-                    );
-
-                let page = Column::new()
+                ).fold(Column::new(),
+                |c, v|c.push(v)
+                ).width(Length::Fill))).into()
+    },
+    TabId::ShelfView(shelf_id) => {
+        match state.all_items.get(shelf_id) {
+            Some(shelf_items) => {
+                Column::new()
+                    .push(Container::new(
+                        text(format!("Viewing {}", shelf_id)).size(30)
+                    ).width(Length::Fill).center_x()
+                    )
                     .push(
-                    Container::new(
-                            tabs
-                        )
-                        .width(Fill)
-                        .height(Shrink)
-                        .padding(5))
-                    .push(
-                        Container::new(page_content)
-                        .width(Fill)
-                        .height(Fill)
-                    );
+                    row![
+                            text("Item").width(Length::FillPortion(1)),
+                            // Rule::vertical(2),
+                            text("Description").width(Length::FillPortion(4)),
+                            // Rule::vertical(2),
+                            text("Price").width(Length::FillPortion(1)),
+                            // Rule::vertical(2),
+                            text("Stock").width(Length::FillPortion(1))
+                        ].height(Length::Shrink)
+                ).push(
+                    Rule::horizontal(2)
+                ).push(
+                Scrollable::new(shelf_items.iter().map(
+                    |s|{
+                        Container::new(row![
+                            text(s.object_id.clone()).width(Length::FillPortion(1)),
+                            // Rule::vertical(2),
+                            text(s.description.clone()).width(Length::FillPortion(4)),
+                            // Rule::vertical(2),
+                            text(s.price).width(Length::FillPortion(1)),
+                            // Rule::vertical(2),
+                            text(s.stock).width(Length::FillPortion(1))
+                        ]).height(Length::Units(40)).center_y()
+                    }
+                ).fold(Column::new(),
+                |c, v|c.push(v)
+                ).width(Length::Fill))).into()
+            },
+            None => {text("Invalid shelf tab").into()}
+        }
+    }
+    };
 
-                Modal::new(state.edit_item.is_some(), FloatingElement::new(
-                    Container::new(page).width(Fill).height(Fill),
-                    || {
-                            Button::new(Container::new(get_icon('\u{F4FE}').size(30)).width(Length::Fill).height(Length::Fill).center_x().center_y())
-                                .style(theme::Button::Custom(Box::new(Fab)))
-                                .width(Length::Units(50))
-                                .height(Length::Units(50))
-                                .on_press(
-                                match state.current_tab.last().unwrap_or_default() {
-                                    TabId::AllShelves => StartEditing(NewShelf),
-                                    TabId::AllItems => StartEditing(NewItem{shelf_id: None}),
-                                    TabId::ShelfView(shelf_id) => StartEditing(NewItem{shelf_id: Some(shelf_id.clone())})
-                                }
-                            ).into()
-                        }),
-                        move || {
-                            match state.edit_item.as_ref() {
-                                None => text("Nothing to edit"),
-                                Some(target) => match target {
-                                    EditTarget::EditItem { shelf_id, item_id } => text(format!("Editing item with id {} in shelf with id {}", item_id, shelf_id)),
-                                    EditTarget::NewItem { shelf_id } => match shelf_id {
-                                        None => text(format!("Creating new item in shelf with no default shelf id")),
-                                        Some(shelf_id) => text(format!("Creating new item in shelf with default shelf id {}", shelf_id))
-                                    },
-                                    EditTarget::EditSlot { shelf_id, slot_id } => text(format!("Editing slot with id {} in shelf with id {}", slot_id, shelf_id)),
-                                    EditTarget::NewShelf => text("Creating new shelf"),
-                                    EditTarget::EditShelf { shelf_id } => text(format!("Editing shelf with id {}", shelf_id)),
-                                }
-                            }.into()
-                        }).backdrop(StopEditing).into()
+    let mut tabs = state.tabs.iter()
+    .map(| tab_info| match tab_info {
+        TabId::AllShelves => create_tab(tab_info.clone(), "Shelves".to_owned(), false, Some('\u{F685}')),
+        TabId::AllItems => create_tab(tab_info.clone(), "Items".to_owned(), false, Some('\u{F7D3}')),
+        TabId::ShelfView(shelf_id) => {
+            create_tab(tab_info.clone(), shelf_id.clone(), true, Some('\u{F1C8}'))
+        }
+    })
+    .fold(
+        Row::new(),
+        |tabs_container, tab|{
+            tabs_container.push(Space::with_width(Length::Units(2))).push(tab)
+        }
+    ).push(Space::with_width(Length::Fill));
+
+    tabs = match state.current_tab.last().unwrap_or_default() {
+    TabId::AllShelves => tabs.push(
+    button(get_icon('\u{F116}')).on_press(UpdateShelves(None))
+    ),
+    TabId::AllItems => tabs.push(
+        button(get_icon('\u{F116}')).on_press(UpdateItems(None))
+    ),
+        TabId::ShelfView(shelf_id) => tabs.push(
+            button(get_icon('\u{F116}')).on_press(UpdateItems(Some(shelf_id.clone())))
+        ),
+    _=> tabs
+    };
+
+    let page = Column::new()
+    .push(
+    Container::new(
+            tabs
+        )
+        .width(Fill)
+        .height(Shrink)
+        .padding(5))
+    .push(
+        Container::new(page_content)
+        .width(Fill)
+        .height(Fill)
+    );
+
+    Modal::new(state.edit_item.is_some(), FloatingElement::new(
+    Container::new(page).width(Fill).height(Fill),
+    || {
+            Button::new(Container::new(get_icon('\u{F4FE}').size(30)).width(Length::Fill).height(Length::Fill).center_x().center_y())
+                .style(theme::Button::Custom(Box::new(Fab)))
+                .width(Length::Units(50))
+                .height(Length::Units(50))
+                .on_press(
+                match state.current_tab.last().unwrap_or_default() {
+                    TabId::AllShelves => StartEditing(NewShelf{shelf_name: "".to_owned(), slots: "0".to_owned(), error_message: None}),
+                    TabId::AllItems => StartEditing(NewItem{shelf_id: None}),
+                    TabId::ShelfView(shelf_id) => StartEditing(NewItem{shelf_id: Some(shelf_id.clone())})
+                }
+            ).into()
+        }),
+        move || {
+            match state.edit_item.as_ref() {
+                None => text("Nothing to edit").into(),
+                Some(target) => match target {
+                    EditTarget::EditItem { shelf_id, item_id } => text(format!("Editing item with id {} in shelf with id {}", item_id, shelf_id)).into(),
+                    EditTarget::NewItem { shelf_id } => match shelf_id {
+                        None => text(format!("Creating new item in shelf with no default shelf id")).into(),
+                        Some(shelf_id) => text(format!("Creating new item in shelf with default shelf id {}", shelf_id)).into()
+                    },
+                    EditTarget::EditSlot { shelf_id, slot_id } => text(format!("Editing slot with id {} in shelf with id {}", slot_id, shelf_id)).into(),
+                    EditTarget::NewShelf{shelf_name, slots, error_message} => {
+                        let mut card_content = column![
+                                      row![Text::new("Name").width(Length::Units(60)), TextInput::new("Shelf name", shelf_name, Message::CreateObjectNameInputChanged)],
+                                      Space::with_height(Length::Units(5)),
+                                      row![Text::new("Slots").width(Length::Units(60)), TextInput::new("Slots", &format!("{}", slots), Message::ShelfSlotCountInputChanged)],
+                                      Space::with_height(Length::Units(5)),
+                                  ];
+                        if let Some(message) = error_message {
+                            card_content = card_content.push(text(message)).push(Space::with_height(Length::Units(5)));
+                        }
+                        card_content = card_content.push(row![Space::with_width(Length::FillPortion(5)), Button::new("Create").width(Length::FillPortion(1)).on_press(Message::CreateShelf)]);
+
+                        Card::new(text("New Shelf").width(Length::Fill),
+                                  card_content).width(Length::Units(400)).into()
+                    },
+                    EditTarget::EditShelf { shelf_id } => text(format!("Editing shelf with id {}", shelf_id)).into(),
+                }
+            }
+        }).backdrop(StopEditing).into()
 }

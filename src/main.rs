@@ -1,24 +1,27 @@
+use std::collections::HashMap;
 use async_std::sync::Arc;
 use env_logger::Builder;
 use std::env::set_var;
 use iced::{Application, Command, Element, executor, Theme, window};
 use iced::futures::lock::Mutex;
+use iced::futures::TryFutureExt;
 use iced::Length::{Fill};
 use iced::widget::{
     Container, Text,
 };
 use iced::window::icon::Icon;
 use linked_hash_set::LinkedHashSet;
-use log::{debug, info, LevelFilter};
+use log::{debug, error, info, LevelFilter};
 use tonic::transport::Channel;
+use std::future::IntoFuture;
 
 use crate::assets::logo_bytes;
-use crate::frontend::{EditTarget, LoginResult, RpcCallResult, TabId};
-use crate::frontend::sims_ims_frontend::{ShelfInfo, Shelves};
+use crate::frontend::{create_shelf, EditTarget, GetItemsResponse, LoginResult, read_items, read_shelves, RpcCallResult, TabId};
+use crate::frontend::sims_ims_frontend::{ItemInfo, Items, ShelfInfo, Shelves};
 use crate::frontend::sims_ims_frontend::sims_frontend_client::SimsFrontendClient;
 use crate::states::SimsClientState;
 use crate::ui_messages::Message;
-use crate::ui_messages::Message::{StartEditing, StopEditing, UpdatedShelves};
+use crate::ui_messages::Message::{StartEditing, StopEditing, TabSelected, UpdatedItems, UpdatedShelves, UpdateShelves};
 
 mod assets;
 mod frontend;
@@ -30,11 +33,15 @@ mod views;
 const SERVER_ADDRESS: &str = "http://localhost:50051";
 
 pub fn main() -> iced::Result {
-    Builder::new()
-        .filter_module("cs4471_sims_cli_client", LevelFilter::Debug)
-        .init();
+    if cfg!(debug_assertions) {
+        Builder::new()
+            .filter_module("cs4471_sims_cli_client", LevelFilter::Debug)
+            .init();
+    }
 
-    set_var("WGPU_BACKEND", "vulkan");
+    if !cfg!(macos) {
+        set_var("WGPU_BACKEND", "vulkan");
+    }
     ClientState::run(iced::Settings {
         window: window::Settings {
             icon: match logo_bytes() {
@@ -56,7 +63,8 @@ struct ClientState {
     current_tab: Vec<TabId>,
     tabs: LinkedHashSet<TabId>,
     edit_item: Option<EditTarget>,
-    shelves: Vec<ShelfInfo>
+    shelves: Vec<ShelfInfo>,
+    all_items: HashMap<String, Vec<ItemInfo>>
 }
 
 impl Application for ClientState {
@@ -77,7 +85,8 @@ impl Application for ClientState {
             current_tab: Vec::new(),
             tabs: LinkedHashSet::new(),
             edit_item: None,
-            shelves: Vec::new()
+            shelves: Vec::new(),
+            all_items: HashMap::new()
         };
 
         new_client.tabs.insert(TabId::AllShelves);
@@ -91,6 +100,87 @@ impl Application for ClientState {
 
     fn update(&mut self, message: Self::Message) -> Command<Message> {
         match message {
+            Message::CreateShelf => {
+                match &mut self.edit_item {
+                    None => {info!("Attempted to create shelf with no edit target"); Command::none()},
+                    Some(target) => match target{
+                        EditTarget::NewShelf {shelf_name, slots, error_message} => {
+                            if let Ok(count) = slots.parse::<u32>() {
+                                if count <= 0 {
+                                    error_message.insert("Your shelf must have at least 1 slot".to_owned());
+                                    Command::none()
+                                }
+                                else {
+                                    Command::batch([
+                                        Command::perform(create_shelf(Arc::clone(&self.rpc), shelf_name.clone(), count, self.username.clone(), self.token.as_ref().unwrap().clone()), |_| { UpdateShelves(None) }),
+                                        Command::perform(async{}, |_|{StopEditing})
+                                    ])
+                                }
+                            }else{
+                                error_message.insert("Slots must be a natural number".to_owned());
+                                Command::none()
+                            }
+                        },
+                        _ => Command::none()
+                    }
+                }
+            }
+            Message::ShelfSlotCountInputChanged(ref c) => {
+                match &mut self.edit_item {
+                    None => info!("Received {:?} when not editing anything", message),
+                    Some(target)=> match target {
+                        EditTarget::NewShelf { ref mut slots, .. } => {
+                            *slots = c.clone()
+                        },
+                        _ => unimplemented!()
+                    }
+                };
+                Command::none()
+            }
+            Message::CreateObjectNameInputChanged(ref s) => {
+                match &mut self.edit_item {
+                    None => info!("Received {:?} when not editing anything", message),
+                    Some(target)=> match target {
+                        EditTarget::NewShelf { ref mut shelf_name, .. } => {
+                            *shelf_name = s.clone();
+                        },
+                        _ => unimplemented!()
+                    }
+                };
+                Command::none()
+            }
+            Message::UpdateItems(shelf) => {
+                Command::perform(read_items(Arc::clone(&self.rpc), shelf, self.username.clone(), self.token.as_ref().unwrap().clone()), Message::UpdatedItems)
+            }
+            Message::UpdatedItems(result) => match result {
+                Ok(items) => {
+                    debug!("{:?}", items);
+                    match items {
+                        GetItemsResponse::ShelfItems(shelf_id, items) => {
+                            self.all_items.insert(shelf_id, items.items);
+                        },
+                        GetItemsResponse::AllItems(items) => {
+                            self.all_items.clear();
+                            self.all_items = items.items.into_iter().map(|i|(i.shelf_id.clone(), i)).fold(HashMap::new(), |mut h, v|{
+                                match h.get_mut(&v.0) {
+                                    Some(l)=> l.push(v.1),
+                                    None => {h.insert(v.0, vec![v.1]);}
+                                };
+                                h
+                            });
+                        }
+                    }
+                    Command::none()
+                },
+                Err(e) => {
+                    debug!("Items update failed: {:?}", e);
+                     Command::none()
+                }
+
+            },
+            Message::UpdateShelves(shelf_id) => {
+                Command::perform(frontend::read_shelves(Arc::clone(&self.rpc), shelf_id, self.username.clone(), self.token.as_ref().unwrap().clone()), UpdatedShelves)
+            }
             Message::UsernameInputChanged(s) => {
                 if let SimsClientState::Unauthenticated { .. } = self.state {
                     self.username = s
@@ -161,7 +251,7 @@ impl Application for ClientState {
                         }
                     }
                     Err(err) => {
-                        info!("Failed to log in {:?}", err);
+                        debug!("Failed to log in {:?}", err);
                         self.username = String::new();
                         self.state = SimsClientState::Unauthenticated {
                             password: String::new(),
@@ -181,8 +271,18 @@ impl Application for ClientState {
             }
             Message::TabSelected(tab_id) => {
                 debug!("Selected tab {:?}", tab_id);
-                self.current_tab.push(tab_id);
-                Command::none()
+                self.current_tab.push(tab_id.clone());
+                match tab_id {
+                    TabId::AllItems => {
+                        Command::perform(read_items(Arc::clone(&self.rpc), None, self.username.clone(), self.token.as_ref().unwrap().clone()), UpdatedItems)
+                    }
+                    TabId::AllShelves => {
+                        Command::perform(read_shelves(Arc::clone(&self.rpc), None, self.username.clone(), self.token.as_ref().unwrap().clone()), UpdatedShelves)
+                    }
+                    TabId::ShelfView(shelf_id) => {
+                        Command::perform(read_items(Arc::clone(&self.rpc), Some(shelf_id), self.username.clone(), self.token.as_ref().unwrap().clone()), UpdatedItems)
+                    }
+                }
             }
             Message::CloseShelf(tab_id) => {
                 match tab_id {
@@ -203,9 +303,9 @@ impl Application for ClientState {
             Message::OpenShelf(tab_id) => {
                 if !self.tabs.contains(&tab_id) {
                     self.tabs.insert(tab_id.clone());
-                    self.current_tab.push(tab_id); // there are n + 2 tabs (all shelves and all items)
                 }
-                Command::none()
+
+                Command::perform(async {tab_id}, TabSelected)
             }
             StopEditing => {
                 self.edit_item = None;
