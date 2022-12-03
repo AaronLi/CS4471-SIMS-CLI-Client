@@ -5,6 +5,7 @@ use iced::Length::{Fill, Shrink};
 use iced::widget::image as iced_image;
 use iced_aw::{Modal};
 use iced_aw::floating_element::FloatingElement;
+use std::iter;
 use crate::{assets, ClientState};
 use crate::assets::get_icon;
 use crate::frontend::{create_tab, EditTarget, TabId};
@@ -44,24 +45,97 @@ pub(crate) fn inventory_view(state: &ClientState) -> Element<Message> {
     let page_content: Element<'_, Message> = match state.current_tab.last().unwrap_or_default() {
                     TabId::AllShelves => Column::new().push(Row::new()
                         .push(Text::new("All shelves view"))
-                        .push(Button::new("Meep").on_press(Message::OpenShelf(TabId::ShelfView("shelf0".to_owned()))))
-                        .push(Button::new("Meep2").on_press(Message::OpenShelf(TabId::ShelfView("shelf1".to_owned())))
-                        )).push(
+                        ).push( // list all shelves
                             Scrollable::new(
                             column(
                                 state.shelves.iter()
                                     .map(|s|row![
                                         Text::new(s.shelf_id.clone()),
-                                        Text::new(format!("Slots: {}", s.shelf_count))
+                                        Space::with_width(Length::Units(2)),
+                                        Text::new(format!("Slots: {}", s.shelf_count)),
+                                        Button::new("open").on_press(Message::OpenShelf(TabId::ShelfView(s.shelf_id.clone())))
                                     ].into())
                                     .collect()
                             )
                     ))
                         .into(),
-                    TabId::AllItems => Text::new("All items view").into(),
+                    TabId::AllItems => {
+                        Column::new()
+                            .push(Container::new(
+                                text("All Items").size(30)
+                            ).width(Length::Fill).center_x()
+
+                            )
+                            .push(
+                            row![
+                                    text("Name").width(Length::FillPortion(1)),
+                                    // Rule::vertical(2),
+                                    text("Description").width(Length::FillPortion(3)),
+                                    text("Shelf").width(Length::FillPortion(1)),
+                                    // Rule::vertical(2),
+                                    text("Price").width(Length::FillPortion(1)),
+                                    // Rule::vertical(2),
+                                    text("Stock").width(Length::FillPortion(1))
+                                ].height(Length::Shrink)
+                            ).push(
+                                Rule::horizontal(2)
+                            ).push(
+                        Scrollable::new(state.all_items.iter().flat_map(|(k, v)|v.iter().zip(iter::repeat(k))).map(
+                                    |(item, shelf)|{
+                                        row![
+                                            text(item.object_id.clone()).width(Length::FillPortion(1)),
+                                            // Rule::vertical(2),
+                                            text(item.description.clone()).width(Length::FillPortion(3)),
+                                            text(shelf.clone()).width(Length::FillPortion(1)),
+                                            // Rule::vertical(2),
+                                            text(item.price).width(Length::FillPortion(1)),
+                                            // Rule::vertical(2),
+                                            text(item.stock).width(Length::FillPortion(1))
+                                        ]
+                                    }
+                                ).fold(Column::new(),
+                                |c, v|c.push(v)
+                                ).width(Length::Fill))).into()
+                    },
                     TabId::ShelfView(shelf_id) => {
-                        let text_content = format!("Shelf Items view for shelf {}", shelf_id);
-                        text(text_content).into()
+                        match state.all_items.get(shelf_id) {
+                            Some(shelf_items) => {
+                                Column::new()
+                                    .push(Container::new(
+                                        text(format!("Viewing {}", shelf_id)).size(30)
+                                    ).width(Length::Fill).center_x()
+                                    )
+                                    .push(
+                                    row![
+                                            text("Name").width(Length::FillPortion(1)),
+                                            // Rule::vertical(2),
+                                            text("Description").width(Length::FillPortion(4)),
+                                            // Rule::vertical(2),
+                                            text("Price").width(Length::FillPortion(1)),
+                                            // Rule::vertical(2),
+                                            text("Stock").width(Length::FillPortion(1))
+                                        ].height(Length::Shrink)
+                                ).push(
+                                    Rule::horizontal(2)
+                                ).push(
+                                Scrollable::new(shelf_items.iter().map(
+                                    |s|{
+                                        row![
+                                            text(s.object_id.clone()).width(Length::FillPortion(1)),
+                                            // Rule::vertical(2),
+                                            text(s.description.clone()).width(Length::FillPortion(4)),
+                                            // Rule::vertical(2),
+                                            text(s.price).width(Length::FillPortion(1)),
+                                            // Rule::vertical(2),
+                                            text(s.stock).width(Length::FillPortion(1))
+                                        ]
+                                    }
+                                ).fold(Column::new(),
+                                |c, v|c.push(v)
+                                ).width(Length::Fill))).into()
+                            },
+                            None => {text("Invalid shelf tab").into()}
+                        }
                     }
                 };
 

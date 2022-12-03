@@ -1,8 +1,10 @@
+use std::collections::HashMap;
 use async_std::sync::Arc;
 use env_logger::Builder;
 use std::env::set_var;
 use iced::{Application, Command, Element, executor, Theme, window};
 use iced::futures::lock::Mutex;
+use iced::futures::TryFutureExt;
 use iced::Length::{Fill};
 use iced::widget::{
     Container, Text,
@@ -11,14 +13,15 @@ use iced::window::icon::Icon;
 use linked_hash_set::LinkedHashSet;
 use log::{debug, info, LevelFilter};
 use tonic::transport::Channel;
+use std::future::IntoFuture;
 
 use crate::assets::logo_bytes;
-use crate::frontend::{EditTarget, LoginResult, RpcCallResult, TabId};
-use crate::frontend::sims_ims_frontend::{ShelfInfo, Shelves};
+use crate::frontend::{EditTarget, GetItemsResponse, LoginResult, read_items, read_shelves, RpcCallResult, TabId};
+use crate::frontend::sims_ims_frontend::{ItemInfo, Items, ShelfInfo, Shelves};
 use crate::frontend::sims_ims_frontend::sims_frontend_client::SimsFrontendClient;
 use crate::states::SimsClientState;
 use crate::ui_messages::Message;
-use crate::ui_messages::Message::{StartEditing, StopEditing, UpdatedShelves};
+use crate::ui_messages::Message::{StartEditing, StopEditing, TabSelected, UpdatedItems, UpdatedShelves, UpdateShelves};
 
 mod assets;
 mod frontend;
@@ -58,7 +61,8 @@ struct ClientState {
     current_tab: Vec<TabId>,
     tabs: LinkedHashSet<TabId>,
     edit_item: Option<EditTarget>,
-    shelves: Vec<ShelfInfo>
+    shelves: Vec<ShelfInfo>,
+    all_items: HashMap<String, Vec<ItemInfo>>
 }
 
 impl Application for ClientState {
@@ -79,7 +83,8 @@ impl Application for ClientState {
             current_tab: Vec::new(),
             tabs: LinkedHashSet::new(),
             edit_item: None,
-            shelves: Vec::new()
+            shelves: Vec::new(),
+            all_items: HashMap::new()
         };
 
         new_client.tabs.insert(TabId::AllShelves);
@@ -93,6 +98,32 @@ impl Application for ClientState {
 
     fn update(&mut self, message: Self::Message) -> Command<Message> {
         match message {
+            Message::UpdatedItems(result) => match result {
+                Ok(items) => {
+                    info!("{:?}", items);
+                    match items {
+                        GetItemsResponse::ShelfItems(shelf_id, items) => {
+                            self.all_items.insert(shelf_id, items.items);
+                        },
+                        GetItemsResponse::AllItems(items) => {
+                            self.all_items.clear();
+                            self.all_items = items.items.into_iter().map(|i|(i.shelf_id.clone(), i)).fold(HashMap::new(), |mut h, v|{
+                                match h.get_mut(&v.0) {
+                                    Some(l)=> l.push(v.1),
+                                    None => {h.insert(v.0, vec![v.1]);}
+                                };
+                                h
+                            });
+                        }
+                    }
+                    Command::none()
+                },
+                Err(e) => {
+                    info!("Items update failed: {:?}", e);
+                     Command::none()
+                }
+
+            },
             Message::UpdateShelves => {
                 Command::perform(frontend::read_shelves(Arc::clone(&self.rpc), None, self.username.clone(), self.token.as_ref().unwrap().clone()), UpdatedShelves)
             }
@@ -186,8 +217,18 @@ impl Application for ClientState {
             }
             Message::TabSelected(tab_id) => {
                 debug!("Selected tab {:?}", tab_id);
-                self.current_tab.push(tab_id);
-                Command::none()
+                self.current_tab.push(tab_id.clone());
+                match tab_id {
+                    TabId::AllItems => {
+                        Command::perform(read_items(Arc::clone(&self.rpc), None, self.username.clone(), self.token.as_ref().unwrap().clone()), UpdatedItems)
+                    }
+                    TabId::AllShelves => {
+                        Command::perform(read_shelves(Arc::clone(&self.rpc), None, self.username.clone(), self.token.as_ref().unwrap().clone()), UpdatedShelves)
+                    }
+                    TabId::ShelfView(shelf_id) => {
+                        Command::perform(read_items(Arc::clone(&self.rpc), Some(shelf_id), self.username.clone(), self.token.as_ref().unwrap().clone()), UpdatedItems)
+                    }
+                }
             }
             Message::CloseShelf(tab_id) => {
                 match tab_id {
@@ -208,9 +249,9 @@ impl Application for ClientState {
             Message::OpenShelf(tab_id) => {
                 if !self.tabs.contains(&tab_id) {
                     self.tabs.insert(tab_id.clone());
-                    self.current_tab.push(tab_id); // there are n + 2 tabs (all shelves and all items)
                 }
-                Command::none()
+
+                Command::perform(async {tab_id}, TabSelected)
             }
             StopEditing => {
                 self.edit_item = None;

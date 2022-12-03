@@ -1,5 +1,5 @@
 use std::sync::mpsc;
-use crate::frontend::{EditTarget, LoginResult, RpcCallResult, TabId};
+use crate::frontend::{EditTarget, GetItemsResponse, LoginResult, RpcCallResult, TabId};
 use crate::frontend::sims_ims_frontend::{ShelfInfo, Shelves, Token};
 
 #[derive(Debug, Clone)]
@@ -15,5 +15,6 @@ pub(crate) enum Message {
     StartEditing(EditTarget),
     StopEditing,
     UpdatedShelves(Result<Shelves, RpcCallResult>),
-    UpdateShelves
+    UpdateShelves,
+    UpdatedItems(Result<GetItemsResponse, RpcCallResult>)
 }
