@@ -11,12 +11,12 @@ use iced::widget::{
 };
 use iced::window::icon::Icon;
 use linked_hash_set::LinkedHashSet;
-use log::{debug, info, LevelFilter};
+use log::{debug, error, info, LevelFilter};
 use tonic::transport::Channel;
 use std::future::IntoFuture;
 
 use crate::assets::logo_bytes;
-use crate::frontend::{EditTarget, GetItemsResponse, LoginResult, read_items, read_shelves, RpcCallResult, TabId};
+use crate::frontend::{create_shelf, EditTarget, GetItemsResponse, LoginResult, read_items, read_shelves, RpcCallResult, TabId};
 use crate::frontend::sims_ims_frontend::{ItemInfo, Items, ShelfInfo, Shelves};
 use crate::frontend::sims_ims_frontend::sims_frontend_client::SimsFrontendClient;
 use crate::states::SimsClientState;
@@ -100,6 +100,55 @@ impl Application for ClientState {
 
     fn update(&mut self, message: Self::Message) -> Command<Message> {
         match message {
+            Message::CreateShelf => {
+                match &mut self.edit_item {
+                    None => {info!("Attempted to create shelf with no edit target"); Command::none()},
+                    Some(target) => match target{
+                        EditTarget::NewShelf {shelf_name, slots, error_message} => {
+                            if let Ok(count) = slots.parse::<u32>() {
+                                if count <= 0 {
+                                    error_message.insert("Your shelf must have at least 1 slot".to_owned());
+                                    Command::none()
+                                }
+                                else {
+                                    Command::batch([
+                                        Command::perform(create_shelf(Arc::clone(&self.rpc), shelf_name.clone(), count, self.username.clone(), self.token.as_ref().unwrap().clone()), |_| { UpdateShelves(None) }),
+                                        Command::perform(async{}, |_|{StopEditing})
+                                    ])
+                                }
+                            }else{
+                                error_message.insert("Slots must be a natural number".to_owned());
+                                Command::none()
+                            }
+                        },
+                        _ => Command::none()
+                    }
+                }
+            }
+            Message::ShelfSlotCountInputChanged(ref c) => {
+                match &mut self.edit_item {
+                    None => info!("Received {:?} when not editing anything", message),
+                    Some(target)=> match target {
+                        EditTarget::NewShelf { ref mut slots, .. } => {
+                            *slots = c.clone()
+                        },
+                        _ => unimplemented!()
+                    }
+                };
+                Command::none()
+            }
+            Message::CreateObjectNameInputChanged(ref s) => {
+                match &mut self.edit_item {
+                    None => info!("Received {:?} when not editing anything", message),
+                    Some(target)=> match target {
+                        EditTarget::NewShelf { ref mut shelf_name, .. } => {
+                            *shelf_name = s.clone();
+                        },
+                        _ => unimplemented!()
+                    }
+                };
+                Command::none()
+            }
             Message::UpdateItems(shelf) => {
                 Command::perform(read_items(Arc::clone(&self.rpc), shelf, self.username.clone(), self.token.as_ref().unwrap().clone()), Message::UpdatedItems)
             }

@@ -3,10 +3,10 @@ use iced::widget::{Button, Column, Container, Image, Row, Text, TextInput, text,
 use iced::{Length};
 use iced::Length::{Fill, Shrink};
 use iced::widget::image as iced_image;
-use iced_aw::{Modal};
+use iced_aw::{Modal, Card};
 use iced_aw::floating_element::FloatingElement;
 use std::iter;
-use crate::{assets, ClientState};
+use crate::{assets, ClientState, ui_messages};
 use crate::assets::get_icon;
 use crate::frontend::{create_tab, EditTarget, TabId};
 use crate::frontend::EditTarget::{NewItem, NewShelf};
@@ -193,7 +193,7 @@ pub(crate) fn inventory_view(state: &ClientState) -> Element<Message> {
                 .height(Length::Units(50))
                 .on_press(
                 match state.current_tab.last().unwrap_or_default() {
-                    TabId::AllShelves => StartEditing(NewShelf),
+                    TabId::AllShelves => StartEditing(NewShelf{shelf_name: "".to_owned(), slots: "0".to_owned(), error_message: None}),
                     TabId::AllItems => StartEditing(NewItem{shelf_id: None}),
                     TabId::ShelfView(shelf_id) => StartEditing(NewItem{shelf_id: Some(shelf_id.clone())})
                 }
@@ -201,17 +201,31 @@ pub(crate) fn inventory_view(state: &ClientState) -> Element<Message> {
         }),
         move || {
             match state.edit_item.as_ref() {
-                None => text("Nothing to edit"),
+                None => text("Nothing to edit").into(),
                 Some(target) => match target {
-                    EditTarget::EditItem { shelf_id, item_id } => text(format!("Editing item with id {} in shelf with id {}", item_id, shelf_id)),
+                    EditTarget::EditItem { shelf_id, item_id } => text(format!("Editing item with id {} in shelf with id {}", item_id, shelf_id)).into(),
                     EditTarget::NewItem { shelf_id } => match shelf_id {
-                        None => text(format!("Creating new item in shelf with no default shelf id")),
-                        Some(shelf_id) => text(format!("Creating new item in shelf with default shelf id {}", shelf_id))
+                        None => text(format!("Creating new item in shelf with no default shelf id")).into(),
+                        Some(shelf_id) => text(format!("Creating new item in shelf with default shelf id {}", shelf_id)).into()
                     },
-                    EditTarget::EditSlot { shelf_id, slot_id } => text(format!("Editing slot with id {} in shelf with id {}", slot_id, shelf_id)),
-                    EditTarget::NewShelf => text("Creating new shelf"),
-                    EditTarget::EditShelf { shelf_id } => text(format!("Editing shelf with id {}", shelf_id)),
+                    EditTarget::EditSlot { shelf_id, slot_id } => text(format!("Editing slot with id {} in shelf with id {}", slot_id, shelf_id)).into(),
+                    EditTarget::NewShelf{shelf_name, slots, error_message} => {
+                        let mut card_content = column![
+                                      row![Text::new("Name").width(Length::Units(60)), TextInput::new("Shelf name", shelf_name, Message::CreateObjectNameInputChanged)],
+                                      Space::with_height(Length::Units(5)),
+                                      row![Text::new("Slots").width(Length::Units(60)), TextInput::new("Slots", &format!("{}", slots), Message::ShelfSlotCountInputChanged)],
+                                      Space::with_height(Length::Units(5)),
+                                  ];
+                        if let Some(message) = error_message {
+                            card_content = card_content.push(text(message)).push(Space::with_height(Length::Units(5)));
+                        }
+                        card_content = card_content.push(row![Space::with_width(Length::FillPortion(5)), Button::new("Create").width(Length::FillPortion(1)).on_press(Message::CreateShelf)]);
+
+                        Card::new(text("New Shelf").width(Length::Fill),
+                                  card_content).width(Length::Units(400)).into()
+                    },
+                    EditTarget::EditShelf { shelf_id } => text(format!("Editing shelf with id {}", shelf_id)).into(),
                 }
-            }.into()
+            }
         }).backdrop(StopEditing).into()
 }

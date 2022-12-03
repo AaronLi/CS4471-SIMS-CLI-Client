@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 iced = {version="0.5.2", features=["tokio", "image", "svg"]}
-iced_aw = {git = "https://github.com/iced-rs/iced_aw", rev = "c6a3bfd", default-features=false, features=["floating_element", "modal"]}
+iced_aw = {git = "https://github.com/iced-rs/iced_aw", rev = "9dc1ff53e4be0934c61d0fc92a23f96252045393", default-features=false, features=["floating_element", "modal", "card",  "colors"]}
 tonic = "0.8.2"
 prost = "0.11.2"
 async-std = "1.12.0"

@@ -17,5 +17,8 @@ pub(crate) enum Message {
     UpdatedShelves(Result<Shelves, RpcCallResult>),
     UpdateShelves(Option<String>),
     UpdatedItems(Result<GetItemsResponse, RpcCallResult>),
-    UpdateItems(Option<String>)
+    UpdateItems(Option<String>),
+    CreateObjectNameInputChanged(String),
+    ShelfSlotCountInputChanged(String),
+    CreateShelf
 }
