@@ -15,6 +15,7 @@ pub(crate) enum Message {
     StartEditing(EditTarget),
     StopEditing,
     UpdatedShelves(Result<Shelves, RpcCallResult>),
-    UpdateShelves,
-    UpdatedItems(Result<GetItemsResponse, RpcCallResult>)
+    UpdateShelves(Option<String>),
+    UpdatedItems(Result<GetItemsResponse, RpcCallResult>),
+    UpdateItems(Option<String>)
 }

@@ -33,9 +33,11 @@ mod views;
 const SERVER_ADDRESS: &str = "http://localhost:50051";
 
 pub fn main() -> iced::Result {
-    Builder::new()
-        .filter_module("cs4471_sims_cli_client", LevelFilter::Debug)
-        .init();
+    if cfg!(debug_assertions) {
+        Builder::new()
+            .filter_module("cs4471_sims_cli_client", LevelFilter::Debug)
+            .init();
+    }
 
     if !cfg!(macos) {
         set_var("WGPU_BACKEND", "vulkan");
@@ -98,9 +100,12 @@ impl Application for ClientState {
 
     fn update(&mut self, message: Self::Message) -> Command<Message> {
         match message {
+            Message::UpdateItems(shelf) => {
+                Command::perform(read_items(Arc::clone(&self.rpc), shelf, self.username.clone(), self.token.as_ref().unwrap().clone()), Message::UpdatedItems)
+            }
             Message::UpdatedItems(result) => match result {
                 Ok(items) => {
-                    info!("{:?}", items);
+                    debug!("{:?}", items);
                     match items {
                         GetItemsResponse::ShelfItems(shelf_id, items) => {
                             self.all_items.insert(shelf_id, items.items);
@@ -119,13 +124,13 @@ impl Application for ClientState {
                     Command::none()
                 },
                 Err(e) => {
-                    info!("Items update failed: {:?}", e);
+                    debug!("Items update failed: {:?}", e);
                      Command::none()
                 }
 
             },
-            Message::UpdateShelves => {
-                Command::perform(frontend::read_shelves(Arc::clone(&self.rpc), None, self.username.clone(), self.token.as_ref().unwrap().clone()), UpdatedShelves)
+            Message::UpdateShelves(shelf_id) => {
+                Command::perform(frontend::read_shelves(Arc::clone(&self.rpc), shelf_id, self.username.clone(), self.token.as_ref().unwrap().clone()), UpdatedShelves)
             }
             Message::UsernameInputChanged(s) => {
                 if let SimsClientState::Unauthenticated { .. } = self.state {
@@ -197,7 +202,7 @@ impl Application for ClientState {
                         }
                     }
                     Err(err) => {
-                        info!("Failed to log in {:?}", err);
+                        debug!("Failed to log in {:?}", err);
                         self.username = String::new();
                         self.state = SimsClientState::Unauthenticated {
                             password: String::new(),
