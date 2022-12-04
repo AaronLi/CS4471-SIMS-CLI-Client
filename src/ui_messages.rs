@@ -20,5 +20,6 @@ pub(crate) enum Message {
     UpdateItems(Option<String>),
     CreateObjectNameInputChanged(String),
     ShelfSlotCountInputChanged(String),
-    CreateShelf
+    CreateTarget,
+    SlotPicked(String)
 }
