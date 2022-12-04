@@ -1,4 +1,4 @@
-use crate::frontend::sims_ims_frontend::{GetItemRequest, GetShelvesRequest, Items, LoginRequest, Shelves, Token};
+use crate::frontend::sims_ims_frontend::{ActionApproved, CreateShelfRequest, GetItemRequest, GetItemsRequest, GetShelvesRequest, Items, LoginRequest, ShelfInfo, Shelves, Token};
 use crate::frontend::LoginResult::{NotConnected, RegisterFailed, ServerError};
 use async_std::sync::Arc;
 use iced::futures::lock::Mutex;
@@ -37,8 +37,8 @@ pub(crate) enum EditTarget {
     EditShelf{shelf_id: String},
     EditItem{shelf_id: String, item_id: String},
     EditSlot{shelf_id: String, slot_id: String},
-    NewItem{shelf_id: Option<String>},
-    NewShelf
+    NewItem{shelf_id: String, item_name: String, item_count: String, error_message: Option<String>},
+    NewShelf{shelf_name: String, slots: String, error_message: Option<String>}
 }
 
 #[derive(Debug, Clone)]
@@ -157,7 +157,7 @@ pub(crate) async fn read_shelves(rpc: Arc<Mutex<Option<SimsFrontendClient<Channe
 pub(crate) async fn read_items(rpc: Arc<Mutex<Option<SimsFrontendClient<Channel>>>>, shelf_id: Option<String>, username: String, token: String) -> Result<GetItemsResponse, RpcCallResult> {
     match rpc.lock().await.as_mut() {
         None => return Err(RpcCallResult::NotConnected),
-        Some(client_rpc) => client_rpc.get_items(GetItemRequest{
+        Some(client_rpc) => client_rpc.get_items(GetItemsRequest{
             shelf_id: shelf_id.clone(),
             username: username.to_owned(),
             token: token.to_owned()})
@@ -168,4 +168,23 @@ pub(crate) async fn read_items(rpc: Arc<Mutex<Option<SimsFrontendClient<Channel>
                 None => GetItemsResponse::AllItems(r.into_inner())
             }),
     }
+}
+
+pub(crate) async fn create_shelf(rpc: Arc<Mutex<Option<SimsFrontendClient<Channel>>>>, shelf_id: String, num_slots: u32, username: String, token: String) -> Result<ActionApproved, RpcCallResult> {
+    match rpc.lock().await.as_mut() {
+        None => return Err(RpcCallResult::NotConnected),
+        Some(client_rpc) => client_rpc.create_shelf(CreateShelfRequest{
+            username,
+            token,
+            shelfinfo: Some(ShelfInfo{ shelf_id, shelf_count: num_slots }),
+        }).await.map_err(|e|RpcCallResult::CallFailed(e.to_string())).map(|r|r.into_inner())
+    }
+}
+
+pub(crate) async fn create_item(rpc: Arc<Mutex<Option<SimsFrontendClient<Channel>>>>, shelf_id: String, count: u32, username: String, token: String, item_name: String) -> Result<(), RpcCallResult> {
+    // match rpc.lock().await.as_mut() {
+    //     None => Err(RpcCallResult::NotConnected),
+    //     Some(client_rpc) => client_rpc.crea
+    // }
+    unimplemented!()
 }

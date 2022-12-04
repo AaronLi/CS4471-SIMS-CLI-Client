@@ -11,17 +11,17 @@ use iced::widget::{
 };
 use iced::window::icon::Icon;
 use linked_hash_set::LinkedHashSet;
-use log::{debug, info, LevelFilter};
+use log::{debug, error, info, LevelFilter};
 use tonic::transport::Channel;
 use std::future::IntoFuture;
 
 use crate::assets::logo_bytes;
-use crate::frontend::{EditTarget, GetItemsResponse, LoginResult, read_items, read_shelves, RpcCallResult, TabId};
+use crate::frontend::{create_item, create_shelf, EditTarget, GetItemsResponse, LoginResult, read_items, read_shelves, RpcCallResult, TabId};
 use crate::frontend::sims_ims_frontend::{ItemInfo, Items, ShelfInfo, Shelves};
 use crate::frontend::sims_ims_frontend::sims_frontend_client::SimsFrontendClient;
 use crate::states::SimsClientState;
 use crate::ui_messages::Message;
-use crate::ui_messages::Message::{StartEditing, StopEditing, TabSelected, UpdatedItems, UpdatedShelves, UpdateShelves};
+use crate::ui_messages::Message::{StartEditing, StopEditing, TabSelected, UpdatedItems, UpdatedShelves, UpdateItems, UpdateShelves};
 
 mod assets;
 mod frontend;
@@ -100,6 +100,98 @@ impl Application for ClientState {
 
     fn update(&mut self, message: Self::Message) -> Command<Message> {
         match message {
+            Message::SlotPicked(s) => {
+                match &mut self.edit_item {
+                    None => {info!("Attempted to create shelf with no edit target"); Command::none()},
+                    Some(target) => match target{
+                        EditTarget::NewItem {shelf_id, ..} => {
+                            *shelf_id = s;
+                            Command::none()
+                        },
+                        _ => Command::none()
+                    }
+                }
+            }
+            Message::CreateTarget => {
+                match &mut self.edit_item {
+                    None => {info!("Attempted to create shelf with no edit target"); Command::none()},
+                    Some(target) => match target{
+                        EditTarget::NewShelf {shelf_name, slots, error_message} => {
+                            if let Ok(count) = slots.parse::<u32>() {
+                                if count <= 0 {
+                                    error_message.insert("Your shelf must have at least 1 slot".to_owned());
+                                    Command::none()
+                                }
+                                else {
+                                    println!("Creating shelf with name {}", shelf_name);
+                                    Command::batch([
+                                        Command::perform(create_shelf(Arc::clone(&self.rpc), shelf_name.clone(), count, self.username.clone(), self.token.as_ref().unwrap().clone()), |result| {match result {Err(e)=>debug!("{:?}", e), _=>{}}; UpdateShelves(None) }),
+                                        Command::perform(async{}, |_|{StopEditing})
+                                    ])
+                                }
+                            }else{
+                                error_message.insert("Slots must be a natural number".to_owned());
+                                Command::none()
+                            }
+                        },
+                        EditTarget::NewItem {item_name, item_count, shelf_id, error_message} => {
+                            if let Ok(count) = item_count.parse::<u32>() {
+                                if shelf_id == "" {
+                                    error_message.insert("You must select a shelf".to_owned()); Command::none()
+                                }else{
+                                        let shelf = shelf_id.clone();
+                                        Command::batch([
+                                        Command::perform(
+                                            create_item(
+                                                Arc::clone(&self.rpc),
+                                                shelf_id.clone(),
+                                                count,
+                                                self.username.clone(),
+                                                self.token.as_ref().unwrap().clone(),
+                                                item_name.clone()),
+                                            |result| {match result {Err(e)=>debug!("{:?}", e), _=>{}}; UpdateItems(Some(shelf)) }),
+                                        Command::perform(async{}, |_|{StopEditing})
+                                    ])
+                                }
+                            }else{
+                                error_message.insert("Slots must be a natural number".to_owned());
+                                Command::none()
+                            }
+                        },
+                        _ => Command::none()
+                    }
+                }
+            }
+            Message::ShelfSlotCountInputChanged(ref c) => {
+                match &mut self.edit_item {
+                    None => info!("Received {:?} when not editing anything", message),
+                    Some(target)=> match target {
+                        EditTarget::NewShelf { ref mut slots, .. } => {
+                            *slots = c.clone()
+                        },
+                        EditTarget::NewItem {ref mut item_count, ..} => {
+                            *item_count = c.clone()
+                        }
+                        _ => info!("Received message {:?} but current EditTarget is unsupported", message)
+                    }
+                };
+                Command::none()
+            }
+            Message::CreateObjectNameInputChanged(ref s) => {
+                match &mut self.edit_item {
+                    None => info!("Received {:?} when not editing anything", message),
+                    Some(target)=> match target {
+                        EditTarget::NewShelf { ref mut shelf_name, .. } => {
+                            *shelf_name = s.clone();
+                        },
+                        EditTarget::NewItem{ref mut item_name, .. } => {
+                            *item_name = s.clone();
+                        }
+                        _ => info!("Received message {:?} but current EditTarget is unsupported", message)
+                    }
+                };
+                Command::none()
+            }
             Message::UpdateItems(shelf) => {
                 Command::perform(read_items(Arc::clone(&self.rpc), shelf, self.username.clone(), self.token.as_ref().unwrap().clone()), Message::UpdatedItems)
             }
